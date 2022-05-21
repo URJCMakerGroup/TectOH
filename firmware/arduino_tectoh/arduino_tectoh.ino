@@ -61,8 +61,8 @@ volatile int lps_line_cnt = 0;    // number of counted lines of the linear posit
 const float mm_per_lps_line = 0.160; // milimiters per line from linear pos sensor
 float lps_mm = 0;    // milimeters count by the linear position sensor (lps)
 
-bool fc_inic_X = true;      // Valor del final de carrera situacion al inicio del experimento
-bool fc_fin_X = true;       // Valor del final de carrera situacion al final del experimento
+bool endstop_x_ini;    // endstop value at x=0
+bool endstop_x_end;    // endstop value at the end
 
 const int TOT_LEN = 400;    // leadscrew length in mm, maximum distance
 
@@ -92,12 +92,20 @@ float vectort_mediomicropaso[] = {0,200,200,200,200,200,200,200,200,200,200,200,
 float vectort_mediopaso[] = {0,529411.76,264705.88,176470.59,132352.94,105882.35,88235.29,75630.25,66176.47,58823.53,52941.18,48128.34,44117.65,40723.98,37815.13,35294.12,33088.24,31141.87,29411.76,27863.78,26470.59,25210.08,24064.17,23017.90,22058.82,21176.47,20361.99,19607.84,18907.56,18255.58,17647.06,17077.80,16544.12,16042.78,15570.93,15126.05,14705.88,14308.43,13931.89,13574.66,13235.29,12912.48,12605.04,12311.90,12032.09,11764.71,11508.95,11264.08,11029.41,10804.32,10588.24,10380.62,10181.00,9988.90,9803.92,9625.67,9453.78,9287.93,9127.79,8973.08,8823.53,8678.88,8538.90,8403.36,8272.06,8144.80,8021.39,7901.67,7785.47,7672.63,7563.03,7456.50,7352.94,7252.22,7154.21,7058.82,6965.94,6875.48,6787.33,6701.41,6617.65,6535.95,6456.24,6378.45,6302.52,6228.37,6155.95,6085.19,6016.04,5948.45,5882.35,5817.71,5754.48,5692.60,5632.04,5572.76,5514.71,5457.85,5402.16,5347.59,5294.12};
 
 
-// VARIABLES MAQUINA DE ESTADOS
+// State values of the user interface
+
+enum st_ui_type { ST_INI,         // initial state, welcome
+                  ST_MENU,        // Navigation through the menu
+                  ST_SET_PARAMS,  // Setting the parameters
+                  ST_RUNNING};    // Running the experiment
 
 int inicio = 0;                       // Variable que inicia el experimento cuando comienza en 0 mm
 int inicio_experimento = 0;           // Variable que inicia el experimento cuando no comienza en 0 mm
 int fin = 0;                          // Variable que para el experimento cuando llega al final de carrera 
-int volatile estado = 0;              // Variables del estado
+
+// before it was volatile, it doesnt seem to need to be volatile because its
+// value is not changed by interrupts
+st_ui_type ui_state = ST_INI; 
 
 
 // LCD variables
@@ -575,7 +583,7 @@ void DefinicionDeVariables()
       }
       break;
       
-    default: // iniciar experimento
+    default: // start experiment
     
       if (rot_enc_pb == true)
       {
@@ -587,7 +595,7 @@ void DefinicionDeVariables()
           Timer4.initialize(t_mediopaso);                 // Inicializacion de la interrupcion de los medios pasos
          
           lcd.clear();
-          estado = 3;
+          ui_state = ST_RUNNING;
         
       }
       else if (rot_enc_rght == true )
@@ -624,15 +632,15 @@ void DefinicionDeVariables()
 
 void experimento() {
 
-  fc_inic_X = digitalRead(X_MIN_PIN);
-  fc_fin_X = digitalRead(X_MAX_PIN);
+  endstop_x_ini = digitalRead(X_MIN_PIN);
+  endstop_x_end = digitalRead(X_MAX_PIN);
   
-  if (fc_inic_X == true )
+  if (endstop_x_ini == true )
   {
     inicio = 1;
   }
 
-  if (fc_fin_X == true )
+  if (endstop_x_end == true )
   {
     fin = 1;
   }
@@ -693,7 +701,7 @@ void experimento() {
     lcd.setCursor(12, 2);    
     lcd.print(n_mediospasos);
 
-    avance_mediospasos = (0.000147*n_mediospasos);       // Avance de cada medio paso del motor = 0.000147 mm, ya que el eje del motor tiene 3 mm/vuelta y una reduccion de 51
+    avance_mediospasos = (0.000147*n_mediospasos);   // Avance de cada medio paso del motor = 0.000147 mm, ya que el eje del motor tiene 3 mm/vuelta y una reduccion de 51
     avance_mediospasos2 = (0.000147*n_mediospasos2);
 
     lcd.setCursor(0, 3);
@@ -752,7 +760,7 @@ void Temporizador() {
 }
 
 void Micropasos() {
-    if (estado == 3 && (avance_mediospasos < df_X) && fin == 0){
+    if (ui_state == ST_RUNNING && (avance_mediospasos < df_X) && fin == 0){
       if (micropasos < 16){
         digitalWrite(X_STEP_PIN , nivel);
         if (nivel == LOW){       //                             <- INTERRUPCION MOVIMIENTO MOTOR TIEMPO MEDIO MICROPASO
@@ -795,30 +803,30 @@ void encoder() {
 
 void loop() {
   
-  switch (estado){
-    case 0:
+  switch (ui_state){
+    case ST_INI:
       pantalla_inicio();
-      estado = 1;
+      ui_state = ST_MENU;
       break;
             
-    case 1:
+    case ST_MENU:
       read_rot_encoder_pb();
   
       if (rot_enc_pb == true) { 
         lcd.clear();
         menu();
-        estado = 2;
+        ui_state = ST_SET_PARAMS;
       }
       
       break;
 
-    case 2:
+    case ST_SET_PARAMS:
       read_rot_encoder_pb();
       read_rot_encoder_dir();
       DefinicionDeVariables();
       break;
    
-    case 3: 
+    case ST_RUNNING: 
       experimento();
       break;    
   }

@@ -116,16 +116,10 @@ byte lcd_colnum = 0; // a byte is enough, 20 lines
 // LCD rotary encoder
 bool rot_enc1, rot_enc2;
 bool rot_enc1_prev, rot_enc2_prev;  // previous values
-bool rot_encpb;  // push button of the rotary encoder
-
-bool direccion = false;        // Direccion del codificador
 
 bool rot_enc_rght   = false;  // if LCD rotary encoder turned clocwise ->
 bool rot_enc_left   = false;  // if LCD rotary encoder turned counter cw <-
 bool rot_enc_pushed = false;  // if LCD rotary encoder pushed
-
-// AAA check
-int i = 0;                 // Contador de pulsos
 
 // New symbols
 
@@ -209,7 +203,6 @@ void read_rot_encoder_dir()
 {
   rot_enc1 = digitalRead(ROT_ENC1_PIN);
   rot_enc2 = digitalRead(ROT_ENC2_PIN);
-  digitalWrite(X_DIR_PIN, direccion); // AAAAAA: shouldnt be here
 
   if (rot_enc1 != rot_enc1_prev || rot_enc2 != rot_enc2_prev)
   {
@@ -238,25 +231,27 @@ void read_rot_encoder_dir()
   rot_enc2_prev = rot_enc2;
 }
 
-// AAA check this function
-void read_rot_encoder_pb()
+bool read_rot_encoder_pb()
 {
-  rot_encpb = digitalRead(ROT_ENCPB_PIN);
+  // only read in the menu user interface, not during the experiment
 
-  if (rot_encpb == false) // risging edge detector
-  {
-    i++;
+  // static variables are only initilized the first time and keep their value
+  // first time to true because it seems that initially is HIGH, maybe due
+  // to de pull-up input
+  static bool rot_enc_pb_prev = true;
+
+
+  bool   rot_enc_pb;  // push button of the rotary encoder
+  bool   pushed = false;
+
+  rot_enc_pb = digitalRead(ROT_ENCPB_PIN);
+
+  if (rot_enc_pb == true && rot_enc_pb_prev == false) {
+    pushed = true;
+    delay(300);
   }
-  if (i >= 80)
-  {
-    rot_enc_pushed = true;
-    i = 0;
-    delay(200);
-  }
-  else
-  {
-    rot_enc_pushed = false;
-  }
+  rot_enc_pb_prev = rot_enc_pb;
+  return pushed;
 }
 
 //////////////////////// ESTADO 0 /////////////////////////
@@ -810,7 +805,7 @@ void loop() {
       break;
             
     case ST_MENU:
-      read_rot_encoder_pb();
+      rot_enc_pushed = read_rot_encoder_pb();
   
       if (rot_enc_pushed == true) { 
         lcd.clear();
@@ -821,7 +816,7 @@ void loop() {
       break;
 
     case ST_SET_PARAMS:
-      read_rot_encoder_pb();
+      rot_enc_pushed = read_rot_encoder_pb();
       read_rot_encoder_dir();
       DefinicionDeVariables();
       break;

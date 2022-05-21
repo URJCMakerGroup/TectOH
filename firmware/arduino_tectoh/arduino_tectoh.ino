@@ -25,11 +25,15 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
                   LCD_PINS_D4, LCD_PINS_D5,
                   LCD_PINS_D6, LCD_PINS_D7);
 
+// LCD size
+
+# define LCD_NUMCOLS 20  // 20 columns
+# define LCD_NUMROWS 4   // 4 rows
 
 // Rotary encoder of LCD
-#define BTN_EN1 31          // Quadrature encoder signal 1
-#define BTN_EN2 33          // Quadrature encoder signal 1
-#define BTN_ENC 35          // Encoder Click (push button)
+#define ROT_ENC1_PIN 31    // Quadrature rotary encoder signal 1
+#define ROT_ENC2_PIN 33    // Quadrature rotary encoder signal 1
+#define ROT_ENCPB_PIN 35   // Rotary encoder push button
 
 // Beeper
 // #define BEEPER_PIN 33
@@ -46,11 +50,12 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 
 // ------------ Linear position sensor
   
-#define LIN_ENC_1_PIN  20  // Linear position encoder 1 pin
-#define LIN_ENC_2_PIN  21  // PIN del canal B del encoder
+#define LIN_ENC1_PIN  20  // Linear position encoder 1 pin
+#define LIN_ENC2_PIN  21  // PIN del canal B del encoder
 
-int valor_sensor1;          // Valor del canal A
-int valor_sensor2;          // Valor del canal B
+// not used, just in the interrupt
+//int lin_enc1;          // Value of linear encoder channel 1
+int lin_enc2;          // Value of linear encoder channel 2
 
 volatile int lineas = 0;    // Numero de lineas que lleva el experimento
 float avance_lineas = 0;    // Avance a partir del numero de lineas y su resolucion
@@ -94,15 +99,16 @@ int fin = 0;                          // Variable que para el experimento cuando
 int volatile estado = 0;              // Variables del estado
 
 
-// VARIABLES LCD
+// LCD variables
 
-int fila, columna = 0;                                             // Variable de fila y columna en la pantalla lcd
+byte lcd_rownum = 0; // a byte is enogh, 4 rows
+byte lcd_colnum = 0; // a byte is enough, 20 lines
 bool btn_en1, btn_en2, btn_enc, btn_en1_prev, btn_en2_prev ;       // Variables de lectura directa del codificador giratorio mecanico
 bool direccion = false;                                            // Direccion del codificador
 bool derecha, izquierda, pulsador = false;                         // Variables de lectura del codificador interpretadas
 int i = 0;                                                         // Contador de pulsos
 
-// SIGNOS CREADOS
+// New symbols
 
 byte empty[8] =
 {
@@ -147,26 +153,26 @@ byte arrow[8] =
 
 void setup() {
 
-  pinMode(BTN_EN1, INPUT_PULLUP);     // LCD rotary encoder 1
-  pinMode(BTN_EN2, INPUT_PULLUP);     // LCD rotary encoder 2
-  pinMode(BTN_ENC, INPUT_PULLUP);     // LCD rotary encoder pushbutton
+  pinMode(ROT_ENC1_PIN, INPUT_PULLUP);     // LCD rotary encoder 1
+  pinMode(ROT_ENC2_PIN, INPUT_PULLUP);     // LCD rotary encoder 2
+  pinMode(ROT_ENCPB_PIN, INPUT_PULLUP);    // LCD rotary encoder pushbutton
   
   pinMode(X_MIN_PIN, INPUT_PULLUP);   // Endstop init position
   pinMode(X_MAX_PIN, INPUT_PULLUP);   // Endstop final position
  
-  pinMode (LIN_ENC_1_PIN, INPUT);     // linear position sensor quadrature encoder 1
-  pinMode (LIN_ENC_2_PIN, INPUT);     // linear position sensor quadrature encoder 2
+  pinMode (LIN_ENC1_PIN, INPUT);     // linear position sensor quadrature encoder 1
+  pinMode (LIN_ENC2_PIN, INPUT);     // linear position sensor quadrature encoder 2
 
-  lcd.begin(20, 4);   // 20 columns x 4 lines
+  lcd.begin(LCD_NUMCOLS, LCD_NUMROWS);   // 20 columns x 4 lines
 
   // stepper motor outputs
   pinMode(X_STEP_PIN , OUTPUT);
-  pinMode(X_DIR_PIN , OUTPUT);
+  pinMode(X_DIR_PIN  , OUTPUT);
   pinMode(X_ENABLE_PIN , OUTPUT);
 
-  btn_en1 , btn_en1_prev = digitalRead(BTN_EN1);
-  btn_en2 , btn_en2_prev = digitalRead(BTN_EN2);
-  btn_enc = digitalRead(BTN_ENC);
+  btn_en1 , btn_en1_prev = digitalRead(ROT_ENC1_PIN);
+  btn_en2 , btn_en2_prev = digitalRead(ROT_ENC2_PIN);
+  btn_enc = digitalRead(ROT_ENCPB_PIN);
 
   lcd.createChar(0, empty);   // 0: numero de carácter; empty: matriz que contiene los pixeles del carácter
   lcd.createChar(1, full);    // 1: numero de carácter; full: matriz que contiene los pixeles del carácter
@@ -175,7 +181,7 @@ void setup() {
  
   digitalWrite(X_ENABLE_PIN , LOW);         // Habilitación a nivel bajo del motor paso a paso
 
-  attachInterrupt(digitalPinToInterrupt(LIN_ENC_1_PIN), encoder, RISING);     // Función de la interrupcion del encoder
+  attachInterrupt(digitalPinToInterrupt(LIN_ENC1_PIN), encoder, RISING);     // Función de la interrupcion del encoder
 
   Timer3.initialize(1000000);              // Inicialización de la interrupcion del contador de segundos
   Timer3.attachInterrupt(Temporizador);    // Función de la interrupcion del contador de segundos
@@ -186,8 +192,8 @@ void setup() {
 
 void leer_encoder()
 {
-  btn_en1 = digitalRead(BTN_EN1);
-  btn_en2 = digitalRead(BTN_EN2);
+  btn_en1 = digitalRead(ROT_ENC1_PIN);
+  btn_en2 = digitalRead(ROT_ENC2_PIN);
   digitalWrite(X_DIR_PIN, direccion);
 
   if (btn_en1 != btn_en1_prev || btn_en2 != btn_en2_prev)
@@ -219,7 +225,7 @@ void leer_encoder()
 
 void leer_pulso()
 {
-  btn_enc = digitalRead(BTN_ENC);
+  btn_enc = digitalRead(ROT_ENCPB_PIN);
 
   if (btn_enc == false) //Detector de flanco del pulsador
   {
@@ -242,12 +248,12 @@ void leer_pulso()
 void pantalla_inicio()
 {
 
-  lcd.setCursor(2, 0);    // posiciona el cursor en la columna 1 fila 0
+  lcd.setCursor(2, 0);    // posiciona el cursor en la lcd_colnum 1 lcd_rownum 0
   lcd.print("ENSAYO DE MODELO");
-  lcd.setCursor(3, 1);    // posiciona el cursor en la columna 1 fila 1
+  lcd.setCursor(3, 1);    // posiciona el cursor en la lcd_colnum 1 lcd_rownum 1
   lcd.print("ANALOGO SIMPLE");
 
-  lcd.setCursor(0, 3);    // posiciona el cursor en la columna 1 fila 3
+  lcd.setCursor(0, 3);    // posiciona el cursor en la lcd_colnum 1 lcd_rownum 3
   lcd.print("Iniciar Experimento");
   
 }
@@ -257,7 +263,9 @@ void pantalla_inicio()
 
 void menu()
 {
-  fila, columna = 0;
+  lcd_rownum = 0;
+  lcd_colnum = 0;
+
   di_X = 0;
   df_X = 0;
   v = 1;
@@ -290,7 +298,7 @@ void menu()
   lcd.write(byte(0));
   lcd.setCursor(0, 3);
   lcd.write(byte(0));
-  lcd.setCursor(0, fila);
+  lcd.setCursor(0, lcd_rownum);
   lcd.write(byte(1));
 }
 
@@ -298,23 +306,23 @@ void menu()
 
 void DefinicionDeVariables()
 {
-  switch (fila) // fila es la variable vertical de la pantalla, indica que variable se esta manipulando
+  switch (lcd_rownum) // lcd_rownum es la variable vertical de la pantalla, indica que variable se esta manipulando
   {
     case 0: // modificar la distancia inicial
-      if (pulsador == true  and columna < 3) // columna es una variable que avanza en horizontal por la pantalla, cuando vale 0 podemos cambia en vertical con derecha o izquierda, cuando no aumentamos la variable con la que estemos trabajando
+      if (pulsador == true  and lcd_colnum < 3) // lcd_colnum es una variable que avanza en horizontal por la pantalla, cuando vale 0 podemos cambia en vertical con derecha o izquierda, cuando no aumentamos la variable con la que estemos trabajando
       {
-        columna++;
+        lcd_colnum++;
       }
-      else if (pulsador == true and columna == 3) //hay 4 opciones
+      else if (pulsador == true and lcd_colnum == 3) //hay 4 opciones
       {
-        columna = 0;
+        lcd_colnum = 0;
       }
-      switch (columna)
+      switch (lcd_colnum)
       {
         case 0: //opción 1: seleccionar variable
           if (derecha == true )
           {
-            fila = 1;
+            lcd_rownum = 1;
             lcd.setCursor(0, 0);
             lcd.write(byte(0));
             lcd.setCursor(0, 1);
@@ -326,7 +334,7 @@ void DefinicionDeVariables()
           }
           else if (izquierda == true)
           {
-            fila = 3;
+            lcd_rownum = 3;
             lcd.setCursor(0, 0);
             lcd.write(byte(0));
             lcd.setCursor(0, 1);
@@ -394,20 +402,20 @@ void DefinicionDeVariables()
       }
       break;
     case 1: // modificar la distancia final
-      if (pulsador == true  and columna < 3) // columna es una variable que avanza en horizontal por la pantalla, cuando vale 0 podemos cambia en vertical con derecha o izquierda, cuando no aumentamos la variable con la que estemos trabajando
+      if (pulsador == true  and lcd_colnum < 3) // lcd_colnum es una variable que avanza en horizontal por la pantalla, cuando vale 0 podemos cambia en vertical con derecha o izquierda, cuando no aumentamos la variable con la que estemos trabajando
       {
-        columna++;
+        lcd_colnum++;
       }
-      else if (pulsador == true and columna == 3)
+      else if (pulsador == true and lcd_colnum == 3)
       {
-        columna = 0;
+        lcd_colnum = 0;
       }
-      switch (columna)
+      switch (lcd_colnum)
       {
         case 0: //opción 1: seleccionar variable
           if (derecha == true )
           {
-            fila = 2;
+            lcd_rownum = 2;
             lcd.setCursor(0, 0);
             lcd.write(byte(0));
             lcd.setCursor(0, 1);
@@ -419,7 +427,7 @@ void DefinicionDeVariables()
           }
           else if (izquierda == true)
           {
-            fila = 0;
+            lcd_rownum = 0;
             lcd.setCursor(0, 0);
             lcd.write(byte(1));
             lcd.setCursor(0, 1);
@@ -487,20 +495,20 @@ void DefinicionDeVariables()
       }
       break;
     case 2: // modificar la velocidad
-      if (pulsador == true  and columna < 1) // columna es una variable que avanza en horizontal por la pantalla, cuando vale 0 podemos cambia en vertical con derecha o izquierda, cuando no aumentamos la variable con la que estemos trabajando
+      if (pulsador == true  and lcd_colnum < 1) // lcd_colnum es una variable que avanza en horizontal por la pantalla, cuando vale 0 podemos cambia en vertical con derecha o izquierda, cuando no aumentamos la variable con la que estemos trabajando
       {
-        columna++;
+        lcd_colnum++;
       }
-      else if (pulsador == true and columna == 1) //hay 2 opciones
+      else if (pulsador == true and lcd_colnum == 1) //hay 2 opciones
       {
-        columna = 0;
+        lcd_colnum = 0;
       }
-      switch (columna)
+      switch (lcd_colnum)
       {
         case 0: //opción 1: seleccionar variable
           if (derecha == true )
           {
-            fila = 3;
+            lcd_rownum = 3;
             lcd.setCursor(0, 0);
             lcd.write(byte(0));
             lcd.setCursor(0, 1);
@@ -512,7 +520,7 @@ void DefinicionDeVariables()
           }
           else if (izquierda == true)
           {
-            fila = 1;
+            lcd_rownum = 1;
             lcd.setCursor(0, 0);
             lcd.write(byte(0));
             lcd.setCursor(0, 1);
@@ -567,8 +575,8 @@ void DefinicionDeVariables()
       }
       else if (derecha == true )
       {
-        fila = 0;
-        columna = 0;
+        lcd_rownum = 0;
+        lcd_colnum = 0;
         lcd.setCursor(0, 0);
         lcd.write(byte(1));
         lcd.setCursor(0, 1);
@@ -580,8 +588,8 @@ void DefinicionDeVariables()
       }
       else if (izquierda == true)
       {
-        fila = 2;
-        columna = 0;
+        lcd_rownum = 2;
+        lcd_colnum = 0;
         lcd.setCursor(0, 0);
         lcd.write(byte(0));
         lcd.setCursor(0, 1);
@@ -752,11 +760,12 @@ void MedioPaso() {
     }
 }
 
+// linear encoder interrupt to read lines
 void encoder() {
 
     if (inicio_experimento == 1 && fin == 0) {
-      valor_sensor2 = digitalRead (LIN_ENC_2_PIN);
-      if (valor_sensor2 == LOW){ //                             <- INTERRUPCION ENCODER LEER LINEAS
+      lin_enc2 = digitalRead (LIN_ENC2_PIN);
+      if (lin_enc2 == LOW){
         lineas++;
       }
       else{

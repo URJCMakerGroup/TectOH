@@ -122,7 +122,12 @@ bool rot_enc_pushed = false;  // if LCD rotary encoder pushed
 
 // New symbols
 
-byte empty[8] =
+# define HOL_DIAM    0
+# define FUL_DIAM    1
+# define MICRO       2
+# define BACK_ARROW  3
+
+byte hol_diam[8] = // 0: hollow diamond
 {
   B00000,
   B00100,
@@ -132,7 +137,7 @@ byte empty[8] =
   B01010,
   B00100,
 };
-byte full[8] =
+byte ful_diam[8] = // 1: full diamond
 {
   B00000,
   B00100,
@@ -142,7 +147,7 @@ byte full[8] =
   B01110,
   B00100,
 };
-byte micro[8] =
+byte micro[8] =  // 2: micro symbol
 {
   B00000,
   B10001,
@@ -152,7 +157,7 @@ byte micro[8] =
   B10000,
   B10000,
 };
-byte arrow[8] =
+byte back_arrow[8] =  // 3: back arrow (return)
 {
   B00000,
   B00001,
@@ -182,10 +187,11 @@ void setup() {
   pinMode(X_DIR_PIN  , OUTPUT);
   pinMode(X_ENABLE_PIN , OUTPUT);
 
-  lcd.createChar(0, empty);   // 0: numero de carácter; empty: matriz que contiene los pixeles del carácter
-  lcd.createChar(1, full);    // 1: numero de carácter; full: matriz que contiene los pixeles del carácter
-  lcd.createChar(2, micro);   // 2: numero de carácter; micro: matriz que contiene los pixeles del carácter
-  lcd.createChar(3, arrow);   // 3: número de carácter; arrow: matriz que contiene los pixeles del carácter
+  // creation of new lcd characters
+  lcd.createChar(HOL_DIAM, hol_diam); // 0: hollow diamond
+  lcd.createChar(FUL_DIAM, ful_diam); // 1: full diamond
+  lcd.createChar(MICRO,    micro);    // 3: micro symbol
+  lcd.createChar(BACK_ARROW, back_arrow);  // 4: back arrow (return)
  
   digitalWrite(X_ENABLE_PIN , LOW);  // Stepper motor enable. Active-low
 
@@ -306,15 +312,17 @@ void menu()
   lcd.setCursor(1, 3);
   lcd.print("Iniciar experimento");
   lcd.setCursor(0, 0);
-  lcd.write(byte(0));
+  lcd.write(byte(HOL_DIAM));
   lcd.setCursor(0, 1);
-  lcd.write(byte(0));
+  lcd.write(byte(HOL_DIAM));
   lcd.setCursor(0, 2);
-  lcd.write(byte(0));
+  lcd.write(byte(HOL_DIAM));
   lcd.setCursor(0, 3);
-  lcd.write(byte(0));
+  lcd.write(byte(HOL_DIAM));
   lcd.setCursor(0, lcd_rownum);
-  lcd.write(byte(1));
+  lcd.write(byte(FUL_DIAM));
+  lcd.setCursor(0, lcd_rownum);
+  lcd.cursor(); // to show the cursor
 }
 
 //////////////// ESTADO 2 ////////////////
@@ -341,25 +349,25 @@ void DefinicionDeVariables()
           {
             lcd_rownum = 1;
             lcd.setCursor(0, 0);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 1);
-            lcd.write(byte(1));
+            lcd.write(byte(FUL_DIAM));
             lcd.setCursor(0, 2);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 3);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
           }
           else if (rot_enc_left == true)
           {
             lcd_rownum = 3;
             lcd.setCursor(0, 0);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 1);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 2);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 3);
-            lcd.write(byte(1));
+            lcd.write(byte(FUL_DIAM));
           }
           break;
         case 1: //opción 2: ir sumando y restando de 1 en 1
@@ -436,25 +444,25 @@ void DefinicionDeVariables()
           {
             lcd_rownum = 2;
             lcd.setCursor(0, 0);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 1);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 2);
-            lcd.write(byte(1));
+            lcd.write(byte(FUL_DIAM));
             lcd.setCursor(0, 3);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
           }
           else if (rot_enc_left == true)
           {
             lcd_rownum = 0;
             lcd.setCursor(0, 0);
-            lcd.write(byte(1));
+            lcd.write(byte(FUL_DIAM));
             lcd.setCursor(0, 1);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 2);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 3);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
           }
           break;
         case 1: //opción 2: ir sumando y restando de 1 en 1
@@ -531,25 +539,25 @@ void DefinicionDeVariables()
           {
             lcd_rownum = 3;
             lcd.setCursor(0, 0);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 1);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 2);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 3);
-            lcd.write(byte(1));
+            lcd.write(byte(FUL_DIAM));
           }
           else if (rot_enc_left == true)
           {
             lcd_rownum = 1;
             lcd.setCursor(0, 0);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 1);
-            lcd.write(byte(1));
+            lcd.write(byte(FUL_DIAM));
             lcd.setCursor(0, 2);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
             lcd.setCursor(0, 3);
-            lcd.write(byte(0));
+            lcd.write(byte(HOL_DIAM));
           }
           break;
         default: // opción 2: modificar la velocidad de 1 en 1 o de 10 en 10 en función de la velocidad
@@ -599,26 +607,26 @@ void DefinicionDeVariables()
         lcd_rownum = 0;
         lcd_colnum = 0;
         lcd.setCursor(0, 0);
-        lcd.write(byte(1));
+        lcd.write(byte(FUL_DIAM));
         lcd.setCursor(0, 1);
-        lcd.write(byte(0));
+        lcd.write(byte(HOL_DIAM));
         lcd.setCursor(0, 2);
-        lcd.write(byte(0));
+        lcd.write(byte(HOL_DIAM));
         lcd.setCursor(0, 3);
-        lcd.write(byte(0));
+        lcd.write(byte(HOL_DIAM));
       }
       else if (rot_enc_left == true)
       {
         lcd_rownum = 2;
         lcd_colnum = 0;
         lcd.setCursor(0, 0);
-        lcd.write(byte(0));
+        lcd.write(byte(HOL_DIAM));
         lcd.setCursor(0, 1);
-        lcd.write(byte(0));
+        lcd.write(byte(HOL_DIAM));
         lcd.setCursor(0, 2);
-        lcd.write(byte(1));
+        lcd.write(byte(FUL_DIAM));
         lcd.setCursor(0, 3);
-        lcd.write(byte(0));
+        lcd.write(byte(HOL_DIAM));
       }
       break;
   }

@@ -76,7 +76,7 @@ volatile int segundos = 0;  // Variable que cuenta los segundos del experimento
 
 unsigned long t_mediomicropaso = 0;   // Variable en la que introducimo el tiempo de cada medio micropaso
 unsigned long t_mediopaso = 0;        // Variable en la que introducimo el tiempo de cada medio paso
-int v = 1;                            // Velocidad del sistema
+byte vel_mmh = 1;                      // Speed of the Sandbox in mm/h, from 1 to 99
 volatile int nivel = LOW;             // Nivel del motor paso a paso
 unsigned long micropasos = 0;         // Numero de micropasos dados
 unsigned long n_mediospasos = 0;      // Numero de medios pasos cuando el experimento empieza en 0 mm
@@ -110,9 +110,14 @@ bool rot_enc1, rot_enc2;
 bool rot_enc1_prev, rot_enc2_prev;  // previous values
 bool rot_encpb;  // push button of the rotary encoder
 
-bool direccion = false;                                            // Direccion del codificador
-bool derecha, izquierda, pulsador = false;                         // Variables de lectura del codificador interpretadas
-int i = 0;                                                         // Contador de pulsos
+bool direccion = false;        // Direccion del codificador
+
+bool rot_enc_rght = false;  // if LCD rotary encoder turned clocwise ->
+bool rot_enc_left = false;  // if LCD rotary encoder turned counter cw <-
+bool rot_enc_pb   = false;  // if LCD rotary encoder pushed
+
+// AAA check
+int i = 0;                 // Contador de pulsos
 
 // New symbols
 
@@ -181,7 +186,7 @@ void setup() {
   lcd.createChar(2, micro);   // 2: numero de carácter; micro: matriz que contiene los pixeles del carácter
   lcd.createChar(3, arrow);   // 3: número de carácter; arrow: matriz que contiene los pixeles del carácter
  
-  digitalWrite(X_ENABLE_PIN , LOW);         // Habilitación a nivel bajo del motor paso a paso
+  digitalWrite(X_ENABLE_PIN , LOW);  // Stepper motor enable. Active-low
 
   attachInterrupt(digitalPinToInterrupt(LPS_ENC1_PIN), encoder, RISING);     // Función de la interrupcion del encoder
 
@@ -190,58 +195,59 @@ void setup() {
   
 }
 
-////////////////// PROCESOS ENCODER /////////////////////
+// ------------------ Rotary encoder read 
 
-void leer_encoder()
+void read_rot_encoder_dir()
 {
   rot_enc1 = digitalRead(ROT_ENC1_PIN);
   rot_enc2 = digitalRead(ROT_ENC2_PIN);
-  digitalWrite(X_DIR_PIN, direccion);
+  digitalWrite(X_DIR_PIN, direccion); // AAAAAA: shouldnt be here
 
   if (rot_enc1 != rot_enc1_prev || rot_enc2 != rot_enc2_prev)
   {
     if (rot_enc2 == false & rot_enc1 == false & rot_enc2_prev == true & rot_enc1_prev == false)
     {
-      derecha = true;
-      izquierda = false;
+      rot_enc_rght = true;
+      rot_enc_left = false;
     }
     else if ( rot_enc2 == false & rot_enc1 == false & rot_enc2_prev == false & rot_enc1_prev == true )
     {
-      derecha = false;
-      izquierda = true;
+      rot_enc_rght = false;
+      rot_enc_left = true;
     }
     else
     {
-      derecha = false;
-      izquierda = false;
+      rot_enc_rght = false;
+      rot_enc_left = false;
     }
   }
   else
   {
-    derecha = false;
-    izquierda = false;
+    rot_enc_rght = false;
+    rot_enc_left = false;
   }
   rot_enc1_prev = rot_enc1;
   rot_enc2_prev = rot_enc2;
 }
 
-void leer_pulso()
+// AAA check this function
+void read_rot_encoder_pb()
 {
   rot_encpb = digitalRead(ROT_ENCPB_PIN);
 
-  if (rot_encpb == false) //Detector de flanco del pulsador
+  if (rot_encpb == false) // risging edge detector
   {
     i++;
   }
   if (i >= 80)
   {
-    pulsador = true;
+    rot_enc_pb = true;
     i = 0;
     delay(200);
   }
   else
   {
-    pulsador = false;
+    rot_enc_pb = false;
   }
 }
 
@@ -250,13 +256,16 @@ void leer_pulso()
 void pantalla_inicio()
 {
 
-  lcd.setCursor(2, 0);    // posiciona el cursor en la lcd_colnum 1 lcd_rownum 0
-  lcd.print("ENSAYO DE MODELO");
-  lcd.setCursor(3, 1);    // posiciona el cursor en la lcd_colnum 1 lcd_rownum 1
-  lcd.print("ANALOGO SIMPLE");
+  lcd.setCursor(7, 0);   // set cursor position in lcd_colnum 2 lcd_rownum 0
+  lcd.print("TectOH");
+  lcd.setCursor(3, 1);    // set cursor position in lcd_colnum 3 lcd_rownum 1
+  lcd.print("Open Hardware");
+  lcd.setCursor(2, 2);    // set cursor position in lcd_colnum 3 lcd_rownum 2
+  lcd.print("Tectonics Sanbox");
 
-  lcd.setCursor(0, 3);    // posiciona el cursor en la lcd_colnum 1 lcd_rownum 3
-  lcd.print("Iniciar Experimento");
+
+  lcd.setCursor(0, 3);    // set cursor position in lcd_colnum 1 lcd_rownum 3
+  lcd.print("Press knob to start");
   
 }
 
@@ -270,7 +279,7 @@ void menu()
 
   di_X = 0;
   df_X = 0;
-  v = 1;
+  vel_mmh = 1;
 
   lcd.setCursor(1, 0);
   lcd.print("dist.iniX");
@@ -287,7 +296,7 @@ void menu()
   lcd.setCursor(1, 2);
   lcd.print("velocidad");
   lcd.setCursor(12, 2);
-  lcd.print(v);
+  lcd.print(vel_mmh);
   lcd.setCursor(16, 2);
   lcd.print("mm/h");
   lcd.setCursor(1, 3);
@@ -311,18 +320,20 @@ void DefinicionDeVariables()
   switch (lcd_rownum) // lcd_rownum es la variable vertical de la pantalla, indica que variable se esta manipulando
   {
     case 0: // modificar la distancia inicial
-      if (pulsador == true  and lcd_colnum < 3) // lcd_colnum es una variable que avanza en horizontal por la pantalla, cuando vale 0 podemos cambia en vertical con derecha o izquierda, cuando no aumentamos la variable con la que estemos trabajando
+      // lcd_colnum is the column of the LCD, when 0, is at the left,
+      // and we can select up-down in the menu
+      if (rot_enc_pb == true  and lcd_colnum < 3) 
       {
         lcd_colnum++;
       }
-      else if (pulsador == true and lcd_colnum == 3) //hay 4 opciones
+      else if (rot_enc_pb == true and lcd_colnum == 3) //hay 4 opciones
       {
         lcd_colnum = 0;
       }
       switch (lcd_colnum)
       {
         case 0: //opción 1: seleccionar variable
-          if (derecha == true )
+          if (rot_enc_rght == true )
           {
             lcd_rownum = 1;
             lcd.setCursor(0, 0);
@@ -334,7 +345,7 @@ void DefinicionDeVariables()
             lcd.setCursor(0, 3);
             lcd.write(byte(0));
           }
-          else if (izquierda == true)
+          else if (rot_enc_left == true)
           {
             lcd_rownum = 3;
             lcd.setCursor(0, 0);
@@ -348,7 +359,7 @@ void DefinicionDeVariables()
           }
           break;
         case 1: //opción 2: ir sumando y restando de 1 en 1
-          if (derecha == true and di_X + 1 < TOT_LEN)
+          if (rot_enc_rght == true and di_X + 1 < TOT_LEN)
           {
             di_X = di_X + 1;
             lcd.setCursor(12, 0);
@@ -356,7 +367,7 @@ void DefinicionDeVariables()
             lcd.setCursor(12, 0);
             lcd.print(di_X);
           }
-          else if (izquierda == true and di_X - 1 >= 0)
+          else if (rot_enc_left == true and di_X - 1 >= 0)
           {
             di_X = di_X - 1;
             lcd.setCursor(12, 0);
@@ -366,7 +377,7 @@ void DefinicionDeVariables()
           }
           break;
         case 2: //opción 3: ir sumando y restando de 10 en 10
-          if (derecha == true and di_X + 10 < TOT_LEN)
+          if (rot_enc_rght == true and di_X + 10 < TOT_LEN)
           {
             di_X = di_X + 10;
             lcd.setCursor(12, 0);
@@ -374,7 +385,7 @@ void DefinicionDeVariables()
             lcd.setCursor(12, 0);
             lcd.print(di_X);
           }
-          else if (izquierda == true and di_X - 10 >= 0)
+          else if (rot_enc_left == true and di_X - 10 >= 0)
           {
             di_X = di_X - 10;
             lcd.setCursor(12, 0);
@@ -384,7 +395,7 @@ void DefinicionDeVariables()
           }
           break;
         default: //opción 4: ir sumando y restando de 100 en 100
-          if (derecha == true and di_X + 100 < TOT_LEN)
+          if (rot_enc_rght == true and di_X + 100 < TOT_LEN)
           {
             di_X = di_X + 100;
             lcd.setCursor(12, 0);
@@ -392,7 +403,7 @@ void DefinicionDeVariables()
             lcd.setCursor(12, 0);
             lcd.print(di_X);
           }
-          else if (izquierda == true and di_X - 100 >= 0)
+          else if (rot_enc_left == true and di_X - 100 >= 0)
           {
             di_X = di_X - 100;
             lcd.setCursor(12, 0);
@@ -404,18 +415,20 @@ void DefinicionDeVariables()
       }
       break;
     case 1: // modificar la distancia final
-      if (pulsador == true  and lcd_colnum < 3) // lcd_colnum es una variable que avanza en horizontal por la pantalla, cuando vale 0 podemos cambia en vertical con derecha o izquierda, cuando no aumentamos la variable con la que estemos trabajando
+      // lcd_colnum is the column of the LCD, when 0, is at the left,
+      // and we can select up-down in the menu
+      if (rot_enc_pb == true  and lcd_colnum < 3) 
       {
         lcd_colnum++;
       }
-      else if (pulsador == true and lcd_colnum == 3)
+      else if (rot_enc_pb == true and lcd_colnum == 3)
       {
         lcd_colnum = 0;
       }
       switch (lcd_colnum)
       {
         case 0: //opción 1: seleccionar variable
-          if (derecha == true )
+          if (rot_enc_rght == true )
           {
             lcd_rownum = 2;
             lcd.setCursor(0, 0);
@@ -427,7 +440,7 @@ void DefinicionDeVariables()
             lcd.setCursor(0, 3);
             lcd.write(byte(0));
           }
-          else if (izquierda == true)
+          else if (rot_enc_left == true)
           {
             lcd_rownum = 0;
             lcd.setCursor(0, 0);
@@ -441,7 +454,7 @@ void DefinicionDeVariables()
           }
           break;
         case 1: //opción 2: ir sumando y restando de 1 en 1
-          if (derecha == true and df_X + 1 < TOT_LEN)
+          if (rot_enc_rght == true and df_X + 1 < TOT_LEN)
           {
             df_X = df_X + 1;
             lcd.setCursor(12, 1);
@@ -449,7 +462,7 @@ void DefinicionDeVariables()
             lcd.setCursor(12, 1);
             lcd.print(df_X);
           }
-          else if (izquierda == true and df_X - 1 >= 0)
+          else if (rot_enc_left == true and df_X - 1 >= 0)
           {
             df_X = df_X - 1;
             lcd.setCursor(12, 1);
@@ -459,7 +472,7 @@ void DefinicionDeVariables()
           }
           break;
         case 2: //opción 3: ir sumando y restando de 10 en 10
-          if (derecha == true and df_X + 10 < TOT_LEN)
+          if (rot_enc_rght == true and df_X + 10 < TOT_LEN)
           {
             df_X = df_X + 10;
             lcd.setCursor(12, 1);
@@ -467,7 +480,7 @@ void DefinicionDeVariables()
             lcd.setCursor(12, 1);
             lcd.print(df_X);
           }
-          else if (izquierda == true and df_X - 10 >= 0)
+          else if (rot_enc_left == true and df_X - 10 >= 0)
           {
             df_X = df_X - 10;
             lcd.setCursor(12, 1);
@@ -477,7 +490,7 @@ void DefinicionDeVariables()
           }
           break;
         default: //opción 4: ir sumando y restando de 100 en 100
-          if (derecha == true and df_X + 100 < TOT_LEN)
+          if (rot_enc_rght == true and df_X + 100 < TOT_LEN)
           {
             df_X = df_X + 100;
             lcd.setCursor(12, 1);
@@ -485,7 +498,7 @@ void DefinicionDeVariables()
             lcd.setCursor(12, 1);
             lcd.print(df_X);
           }
-          else if (izquierda == true and df_X - 100 >= 0)
+          else if (rot_enc_left == true and df_X - 100 >= 0)
           {
             df_X = df_X - 100;
             lcd.setCursor(12, 1);
@@ -497,18 +510,20 @@ void DefinicionDeVariables()
       }
       break;
     case 2: // modificar la velocidad
-      if (pulsador == true  and lcd_colnum < 1) // lcd_colnum es una variable que avanza en horizontal por la pantalla, cuando vale 0 podemos cambia en vertical con derecha o izquierda, cuando no aumentamos la variable con la que estemos trabajando
+      // lcd_colnum is the column of the LCD, when 0, is at the left,
+      // and we can select up-down in the menu
+      if (rot_enc_pb == true  and lcd_colnum < 1)
       {
         lcd_colnum++;
       }
-      else if (pulsador == true and lcd_colnum == 1) //hay 2 opciones
+      else if (rot_enc_pb == true and lcd_colnum == 1) //hay 2 opciones
       {
         lcd_colnum = 0;
       }
       switch (lcd_colnum)
       {
         case 0: //opción 1: seleccionar variable
-          if (derecha == true )
+          if (rot_enc_rght == true )
           {
             lcd_rownum = 3;
             lcd.setCursor(0, 0);
@@ -520,7 +535,7 @@ void DefinicionDeVariables()
             lcd.setCursor(0, 3);
             lcd.write(byte(1));
           }
-          else if (izquierda == true)
+          else if (rot_enc_left == true)
           {
             lcd_rownum = 1;
             lcd.setCursor(0, 0);
@@ -534,24 +549,24 @@ void DefinicionDeVariables()
           }
           break;
         default: // opción 2: modificar la velocidad de 1 en 1 o de 10 en 10 en función de la velocidad
-          if (izquierda == true and v - 1 >= 0)
+          if (rot_enc_left == true and vel_mmh - 1 >= 0)
           {
-              v = v - 1;
+              vel_mmh = vel_mmh - 1;
               lcd.setCursor(12, 2);
-              lcd.print(v);
+              lcd.print(vel_mmh);
           }
-          else if (derecha == true and v < 100)
+          else if (rot_enc_rght == true and vel_mmh < 100)
           {
-              v = v + 1;
+              vel_mmh = vel_mmh + 1;
               lcd.setCursor(12, 2);
-              lcd.print(v);
+              lcd.print(vel_mmh);
           }
           
-        if (v <10 && v >=0){
+        if (vel_mmh <10 && vel_mmh >=0){
         lcd.setCursor(13, 2);
         lcd.print(" ");
         }
-        if (v <100 && v >=0){
+        if (vel_mmh <100 && vel_mmh >=0){
         lcd.setCursor(14, 2);
         lcd.print(" ");
         }
@@ -562,20 +577,20 @@ void DefinicionDeVariables()
       
     default: // iniciar experimento
     
-      if (pulsador == true)
+      if (rot_enc_pb == true)
       {
-          t_mediomicropaso = ((unsigned long)vectort_mediomicropaso[v]);     
+          t_mediomicropaso = ((unsigned long)vectort_mediomicropaso[vel_mmh]);     
           Timer1.attachInterrupt(Micropasos);             // Funcion de la interrupcion de los micropasos
           Timer1.initialize(t_mediomicropaso);            // Inicializacion de la interrupcion de los micropasos
           Timer4.attachInterrupt(MedioPaso);              // Funcion de la interrupcion de los medios pasos
-          t_mediopaso = ((unsigned long)(vectort_mediopaso[v]));  
+          t_mediopaso = ((unsigned long)(vectort_mediopaso[vel_mmh]));  
           Timer4.initialize(t_mediopaso);                 // Inicializacion de la interrupcion de los medios pasos
          
           lcd.clear();
           estado = 3;
         
       }
-      else if (derecha == true )
+      else if (rot_enc_rght == true )
       {
         lcd_rownum = 0;
         lcd_colnum = 0;
@@ -588,7 +603,7 @@ void DefinicionDeVariables()
         lcd.setCursor(0, 3);
         lcd.write(byte(0));
       }
-      else if (izquierda == true)
+      else if (rot_enc_left == true)
       {
         lcd_rownum = 2;
         lcd_colnum = 0;
@@ -787,9 +802,9 @@ void loop() {
       break;
             
     case 1:
-      leer_pulso();
+      read_rot_encoder_pb();
   
-      if (pulsador == true) { 
+      if (rot_enc_pb == true) { 
         lcd.clear();
         menu();
         estado = 2;
@@ -798,8 +813,8 @@ void loop() {
       break;
 
     case 2:
-      leer_pulso();
-      leer_encoder();
+      read_rot_encoder_pb();
+      read_rot_encoder_dir();
       DefinicionDeVariables();
       break;
    

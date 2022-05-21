@@ -120,9 +120,9 @@ bool rot_encpb;  // push button of the rotary encoder
 
 bool direccion = false;        // Direccion del codificador
 
-bool rot_enc_rght = false;  // if LCD rotary encoder turned clocwise ->
-bool rot_enc_left = false;  // if LCD rotary encoder turned counter cw <-
-bool rot_enc_pb   = false;  // if LCD rotary encoder pushed
+bool rot_enc_rght   = false;  // if LCD rotary encoder turned clocwise ->
+bool rot_enc_left   = false;  // if LCD rotary encoder turned counter cw <-
+bool rot_enc_pushed = false;  // if LCD rotary encoder pushed
 
 // AAA check
 int i = 0;                 // Contador de pulsos
@@ -249,13 +249,13 @@ void read_rot_encoder_pb()
   }
   if (i >= 80)
   {
-    rot_enc_pb = true;
+    rot_enc_pushed = true;
     i = 0;
     delay(200);
   }
   else
   {
-    rot_enc_pb = false;
+    rot_enc_pushed = false;
   }
 }
 
@@ -330,11 +330,11 @@ void DefinicionDeVariables()
     case 0: // modificar la distancia inicial
       // lcd_colnum is the column of the LCD, when 0, is at the left,
       // and we can select up-down in the menu
-      if (rot_enc_pb == true  and lcd_colnum < 3) 
+      if (rot_enc_pushed == true  and lcd_colnum < 3) 
       {
         lcd_colnum++;
       }
-      else if (rot_enc_pb == true and lcd_colnum == 3) //hay 4 opciones
+      else if (rot_enc_pushed == true and lcd_colnum == 3) //hay 4 opciones
       {
         lcd_colnum = 0;
       }
@@ -425,11 +425,11 @@ void DefinicionDeVariables()
     case 1: // modificar la distancia final
       // lcd_colnum is the column of the LCD, when 0, is at the left,
       // and we can select up-down in the menu
-      if (rot_enc_pb == true  and lcd_colnum < 3) 
+      if (rot_enc_pushed == true  and lcd_colnum < 3) 
       {
         lcd_colnum++;
       }
-      else if (rot_enc_pb == true and lcd_colnum == 3)
+      else if (rot_enc_pushed == true and lcd_colnum == 3)
       {
         lcd_colnum = 0;
       }
@@ -520,11 +520,11 @@ void DefinicionDeVariables()
     case 2: // modificar la velocidad
       // lcd_colnum is the column of the LCD, when 0, is at the left,
       // and we can select up-down in the menu
-      if (rot_enc_pb == true  and lcd_colnum < 1)
+      if (rot_enc_pushed == true  and lcd_colnum < 1)
       {
         lcd_colnum++;
       }
-      else if (rot_enc_pb == true and lcd_colnum == 1) //hay 2 opciones
+      else if (rot_enc_pushed == true and lcd_colnum == 1) //hay 2 opciones
       {
         lcd_colnum = 0;
       }
@@ -585,7 +585,7 @@ void DefinicionDeVariables()
       
     default: // start experiment
     
-      if (rot_enc_pb == true)
+      if (rot_enc_pushed == true)
       {
           t_mediomicropaso = ((unsigned long)vectort_mediomicropaso[vel_mmh]);     
           Timer1.attachInterrupt(Micropasos);             // Funcion de la interrupcion de los micropasos
@@ -812,7 +812,7 @@ void loop() {
     case ST_MENU:
       read_rot_encoder_pb();
   
-      if (rot_enc_pb == true) { 
+      if (rot_enc_pushed == true) { 
         lcd.clear();
         menu();
         ui_state = ST_SET_PARAMS;

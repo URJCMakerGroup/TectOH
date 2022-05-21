@@ -95,7 +95,7 @@ float vectort_mediopaso[] = {0,529411.76,264705.88,176470.59,132352.94,105882.35
 // State values of the user interface
 
 enum st_ui_type { ST_INI,         // initial state, welcome
-                  ST_MENU,        // Navigation through the menu
+                  //ST_MENU,        // Navigation through the menu
                   ST_SET_PARAMS,  // Setting the parameters
                   ST_RUNNING};    // Running the experiment
 
@@ -801,20 +801,16 @@ void loop() {
   switch (ui_state){
     case ST_INI:
       pantalla_inicio();
-      ui_state = ST_MENU;
-      break;
-            
-    case ST_MENU:
       rot_enc_pushed = read_rot_encoder_pb();
-  
       if (rot_enc_pushed == true) { 
         lcd.clear();
         menu();
         ui_state = ST_SET_PARAMS;
       }
-      
       break;
-
+    //case ST_MENU:
+      // not needed
+      //break;
     case ST_SET_PARAMS:
       rot_enc_pushed = read_rot_encoder_pb();
       read_rot_encoder_dir();

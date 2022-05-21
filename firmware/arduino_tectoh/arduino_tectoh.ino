@@ -115,7 +115,6 @@ byte lcd_colnum = 0; // a byte is enough, 20 lines
 
 // LCD rotary encoder
 bool rot_enc1, rot_enc2;
-bool rot_enc1_prev, rot_enc2_prev;  // previous values
 
 bool rot_enc_rght   = false;  // if LCD rotary encoder turned clocwise ->
 bool rot_enc_left   = false;  // if LCD rotary encoder turned counter cw <-
@@ -201,35 +200,37 @@ void setup() {
 
 void read_rot_encoder_dir()
 {
+  // static variables are only initilized the first time and keep their value
+  static bool rot_enc1_prev = false; // previous values
+  static bool rot_enc2_prev = false;
+
   rot_enc1 = digitalRead(ROT_ENC1_PIN);
   rot_enc2 = digitalRead(ROT_ENC2_PIN);
 
   if (rot_enc1 != rot_enc1_prev || rot_enc2 != rot_enc2_prev)
   {
-    if (rot_enc2 == false & rot_enc1 == false & rot_enc2_prev == true & rot_enc1_prev == false)
+    if (rot_enc2      == false && rot_enc1      == false &&
+        rot_enc2_prev == true  && rot_enc1_prev == false)
     {
       rot_enc_rght = true;
       rot_enc_left = false;
-    }
-    else if ( rot_enc2 == false & rot_enc1 == false & rot_enc2_prev == false & rot_enc1_prev == true )
+    } else if ( rot_enc2      == false && rot_enc1      == false &&
+                rot_enc2_prev == false && rot_enc1_prev == true )
     {
       rot_enc_rght = false;
       rot_enc_left = true;
-    }
-    else
-    {
+    } else {
       rot_enc_rght = false;
       rot_enc_left = false;
     }
-  }
-  else
-  {
+  } else {
     rot_enc_rght = false;
     rot_enc_left = false;
   }
   rot_enc1_prev = rot_enc1;
   rot_enc2_prev = rot_enc2;
 }
+
 
 bool read_rot_encoder_pb()
 {
@@ -808,8 +809,7 @@ void loop() {
         ui_state = ST_SET_PARAMS;
       }
       break;
-    //case ST_MENU:
-      // not needed
+    //case ST_MENU: // not needed
       //break;
     case ST_SET_PARAMS:
       rot_enc_pushed = read_rot_encoder_pb();

@@ -202,6 +202,35 @@ void setup() {
   
 }
 
+
+// -------------- lcdprint_rght
+// print an integer in the lcd aligned to the right
+// number: number to print
+// col: colum to start printing (most left)
+// row: row to print
+// max_digit : maximum number of digits to be printed. Needed to align right
+
+void lcdprint_rght (int number, int max_digit)
+{
+  int index = 0;
+  // write whitespaces to delete what is down
+  
+  int max_number;
+
+  max_number = int(pow(10, max_digit-1));
+
+  //lcd.setCursor(col, row);
+  for (index = 0; index < max_digit-1; index++) {
+    if (number > max_number) {
+      break;
+    }
+    max_number = int(max_number/10);
+    lcd.print(" ");
+  }  
+  lcd.print(number);
+
+}
+
 // ------------------ Rotary encoder read 
 
 void read_rot_encoder_dir()
@@ -261,9 +290,9 @@ bool read_rot_encoder_pb()
   return pushed;
 }
 
-//////////////////////// ESTADO 0 /////////////////////////
+// ------ ST_INI: initial state
 
-void pantalla_inicio()
+void init_screen()
 {
 
   lcd.setCursor(7, 0);   // set cursor position in lcd_colnum 2 lcd_rownum 0
@@ -280,7 +309,7 @@ void pantalla_inicio()
 }
 
 
-//////////////// ESTADO 1 ////////////////
+//  Print menu on screen
 
 void menu()
 {
@@ -294,7 +323,7 @@ void menu()
   lcd.setCursor(1, 0);
   lcd.print("dist.iniX");
   lcd.setCursor(12, 0);
-  lcd.print(di_X);
+  lcdprint_rght(di_X,3);
   lcd.setCursor(18, 0);
   lcd.print("mm");
   lcd.setCursor(1, 1);
@@ -322,29 +351,39 @@ void menu()
   lcd.setCursor(0, lcd_rownum);
   lcd.write(byte(FUL_DIAM));
   lcd.setCursor(0, lcd_rownum);
-  lcd.cursor(); // to show the cursor
 }
 
-//////////////// ESTADO 2 ////////////////
+// set experiment parameters
 
-void DefinicionDeVariables()
+void set_params()
 {
-  switch (lcd_rownum) // lcd_rownum es la variable vertical de la pantalla, indica que variable se esta manipulando
+  // lcd_rownum indicates in which row we are -> which parameter we are modifying
+  // 0: Initial X
+  // 1: Final X
+  // 3: Speed
+  // 4: Start experiment
+  // lcd_colnum indicates what are we changing
+  // 0: the row -> the parameter
+  // 1: units
+  // 2: tens
+  // 3: hundreds
+  
+  switch (lcd_rownum)
   {
-    case 0: // modificar la distancia inicial
+    case 0: // input initial X
       // lcd_colnum is the column of the LCD, when 0, is at the left,
       // and we can select up-down in the menu
       if (rot_enc_pushed == true  and lcd_colnum < 3) 
       {
         lcd_colnum++;
       }
-      else if (rot_enc_pushed == true and lcd_colnum == 3) //hay 4 opciones
+      else if (rot_enc_pushed == true and lcd_colnum == 3) // 4 places
       {
         lcd_colnum = 0;
       }
       switch (lcd_colnum)
       {
-        case 0: //opción 1: seleccionar variable
+        case 0: // Parameter selection
           if (rot_enc_rght == true )
           {
             lcd_rownum = 1;
@@ -370,59 +409,41 @@ void DefinicionDeVariables()
             lcd.write(byte(FUL_DIAM));
           }
           break;
-        case 1: //opción 2: ir sumando y restando de 1 en 1
+        case 1: // add or dif in units
           if (rot_enc_rght == true and di_X + 1 < TOT_LEN)
           {
             di_X = di_X + 1;
-            lcd.setCursor(12, 0);
-            lcd.print("   ");
-            lcd.setCursor(12, 0);
-            lcd.print(di_X);
           }
           else if (rot_enc_left == true and di_X - 1 >= 0)
           {
             di_X = di_X - 1;
-            lcd.setCursor(12, 0);
-            lcd.print("   ");
-            lcd.setCursor(12, 0);
-            lcd.print(di_X);
           }
+          lcd.setCursor(12, 0);
+          lcdprint_rght(di_X, 3);
           break;
-        case 2: //opción 3: ir sumando y restando de 10 en 10
+        case 2: //Add or dif in tens
           if (rot_enc_rght == true and di_X + 10 < TOT_LEN)
           {
             di_X = di_X + 10;
-            lcd.setCursor(12, 0);
-            lcd.print("   ");
-            lcd.setCursor(12, 0);
-            lcd.print(di_X);
           }
           else if (rot_enc_left == true and di_X - 10 >= 0)
           {
             di_X = di_X - 10;
-            lcd.setCursor(12, 0);
-            lcd.print("   ");
-            lcd.setCursor(12, 0);
-            lcd.print(di_X);
           }
+          lcd.setCursor(12, 0);
+          lcdprint_rght(di_X, 3);
           break;
-        default: //opción 4: ir sumando y restando de 100 en 100
+        default: //add or sub in hundreds
           if (rot_enc_rght == true and di_X + 100 < TOT_LEN)
           {
             di_X = di_X + 100;
-            lcd.setCursor(12, 0);
-            lcd.print("   ");
-            lcd.setCursor(12, 0);
-            lcd.print(di_X);
           }
           else if (rot_enc_left == true and di_X - 100 >= 0)
           {
             di_X = di_X - 100;
-            lcd.setCursor(12, 0);
-            lcd.print("   ");
-            lcd.setCursor(12, 0);
-            lcd.print(di_X);
           }
+          lcd.setCursor(12, 0);
+          lcdprint_rght(di_X, 3);
           break;
       }
       break;
@@ -809,7 +830,7 @@ void loop() {
   
   switch (ui_state){
     case ST_INI:
-      pantalla_inicio();
+      init_screen();
       rot_enc_pushed = read_rot_encoder_pb();
       if (rot_enc_pushed == true) { 
         lcd.clear();
@@ -822,7 +843,7 @@ void loop() {
     case ST_SET_PARAMS:
       rot_enc_pushed = read_rot_encoder_pb();
       read_rot_encoder_dir();
-      DefinicionDeVariables();
+      set_params();
       break;
    
     case ST_RUNNING: 

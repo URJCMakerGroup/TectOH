@@ -1,32 +1,53 @@
-#include <TimerOne.h>       // Libreria del timer 1
-#include <TimerThree.h>     // Libreria del timer 3
-#include <TimerFour.h>      // Libreria del timer 4
 
-#include <LiquidCrystal.h>  // Libreria de la pantalla LCD
-LiquidCrystal lcd(16, 17, 23, 25, 27, 29);
+// Libraries: https://docs.arduino.cc/software/ide-v1/tutorials/installing-libraries
+// https://www.arduino.cc/reference/en/libraries/timerone
+#include <TimerOne.h>
+// https://www.arduino.cc/reference/en/libraries/timerthree
+#include <TimerThree.h>
+// https://www.arduino.cc/reference/en/libraries/timerfour
+#include <TimerFour.h>      // https://www.arduino.cc/reference/en/libraries/timerfour
 
-//Pines de la shield
-#define LCD_PINS_RS 16      // LCD control conectado a GADGETS3D  shield LCDRS
-#define LCD_PINS_ENABLE 17  // LCD enable pin conectado a GADGETS3D shield LCDE
-#define LCD_PINS_D4 23      // LCD signal pin, conectado a GADGETS3D shield LCD4
-#define LCD_PINS_D5 25      // LCD signal pin, conectado a GADGETS3D shield LCD5
-#define LCD_PINS_D6 27      // LCD signal pin, conectado a GADGETS3D shield LCD6
-#define LCD_PINS_D7 29      // LCD signal pin, conectado a GADGETS3D shield LCD7
-#define X_MIN_PIN 3         // PIN para el fin de carrera colocado al inicio del recorrido (1: presionado (true))
-#define X_MAX_PIN 2         // PIN para el fin de carrera colocado al inicio del recorrido (1: presionado (true))
+// LCD library: https://www.arduino.cc/reference/en/libraries/liquidcrystal/
+#include <LiquidCrystal.h>
 
-#define X_STEP_PIN 54       // PIN de los pasos del controlador DRV8825 del motor paso a paso
-#define X_DIR_PIN 55        // PIN de la direccion del controlador DRV8825 del motor paso a paso
-#define X_ENABLE_PIN 38     // PIN del enable del controlador DRV8825 del motor paso a paso
+// -------------- LCD and rotary encoder smart controller
+// LCD pins
+#define LCD_PINS_RS 16      // LCD control RS pin
+#define LCD_PINS_ENABLE 17  // LCD enable pin
+#define LCD_PINS_D4 23      // LCD data bit 4
+#define LCD_PINS_D5 25      // LCD data bit 5
+#define LCD_PINS_D6 27      // LCD data bit 6
+#define LCD_PINS_D7 29      // LCD data bit 7
 
-#define BTN_EN1 31          // Encoder, conectado a GADGETS3D shield S_E1
-#define BTN_EN2 33          // Encoder, cconectado a GADGETS3D shield S_E2
-#define BTN_ENC 35          // Encoder Click, connected to Gadgets3D shield S_EC
+// creates a variable of type LiquidCrystal:
+// LiquidCrystal(rs, enable, d4, d5, d6, d7)
+LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
+                  LCD_PINS_D4, LCD_PINS_D5,
+                  LCD_PINS_D6, LCD_PINS_D7);
 
-// VARIABLES MEDIDA POSICION
+
+// Rotary encoder of LCD
+#define BTN_EN1 31          // Quadrature encoder signal 1
+#define BTN_EN2 33          // Quadrature encoder signal 1
+#define BTN_ENC 35          // Encoder Click (push button)
+
+// Beeper
+// #define BEEPER_PIN 33
+
+// ----------- Endstops 
+#define X_MIN_PIN 3         // INIT endstop x=0 (True when pressed)
+#define X_MAX_PIN 2         // END endstop (True when pressed)
+
+
+// ------------ Stepper motor
+#define X_STEP_PIN 54       // STEP pin for the first stepper motor driver (axis X)
+#define X_DIR_PIN 55        // DIR pin for the first stepper motor driver (axis X)
+#define X_ENABLE_PIN 38     // ENABLE pin for the first stepper motor driver (axis X)
+
+// ------------ Linear position sensor
   
-int sensor1 = 20;           // PIN del canal A del encoder
-int sensor2 = 21;           // PIN del canal B del encoder
+#define LIN_ENC_1_PIN  20  // Linear position encoder 1 pin
+#define LIN_ENC_2_PIN  21  // PIN del canal B del encoder
 
 int valor_sensor1;          // Valor del canal A
 int valor_sensor2;          // Valor del canal B
@@ -126,18 +147,19 @@ byte arrow[8] =
 
 void setup() {
 
-  pinMode(BTN_EN1, INPUT_PULLUP);     // Encoder 1
-  pinMode(BTN_EN2, INPUT_PULLUP);     // Encoder 2
-  pinMode(BTN_ENC, INPUT_PULLUP);     // Encoder Swith
+  pinMode(BTN_EN1, INPUT_PULLUP);     // LCD rotary encoder 1
+  pinMode(BTN_EN2, INPUT_PULLUP);     // LCD rotary encoder 2
+  pinMode(BTN_ENC, INPUT_PULLUP);     // LCD rotary encoder pushbutton
   
-  pinMode(X_MIN_PIN, INPUT_PULLUP);   // Fin de carrera inicio  
-  pinMode(X_MAX_PIN, INPUT_PULLUP);   // Fin de carrera final           
+  pinMode(X_MIN_PIN, INPUT_PULLUP);   // Endstop init position
+  pinMode(X_MAX_PIN, INPUT_PULLUP);   // Endstop final position
  
-  pinMode (sensor1, INPUT);           // Canal A del encoder
-  pinMode (sensor2, INPUT);           // Canal B del encoder
+  pinMode (LIN_ENC_1_PIN, INPUT);     // linear position sensor quadrature encoder 1
+  pinMode (LIN_ENC_2_PIN, INPUT);     // linear position sensor quadrature encoder 2
 
-  lcd.begin(20, 4);   // 20 columnas y 4 filas
+  lcd.begin(20, 4);   // 20 columns x 4 lines
 
+  // stepper motor outputs
   pinMode(X_STEP_PIN , OUTPUT);
   pinMode(X_DIR_PIN , OUTPUT);
   pinMode(X_ENABLE_PIN , OUTPUT);
@@ -153,7 +175,7 @@ void setup() {
  
   digitalWrite(X_ENABLE_PIN , LOW);         // Habilitación a nivel bajo del motor paso a paso
 
-  attachInterrupt(digitalPinToInterrupt(sensor1), encoder, RISING);     // Función de la interrupcion del encoder
+  attachInterrupt(digitalPinToInterrupt(LIN_ENC_1_PIN), encoder, RISING);     // Función de la interrupcion del encoder
 
   Timer3.initialize(1000000);              // Inicialización de la interrupcion del contador de segundos
   Timer3.attachInterrupt(Temporizador);    // Función de la interrupcion del contador de segundos
@@ -733,7 +755,7 @@ void MedioPaso() {
 void encoder() {
 
     if (inicio_experimento == 1 && fin == 0) {
-      valor_sensor2 = digitalRead (sensor2);
+      valor_sensor2 = digitalRead (LIN_ENC_2_PIN);
       if (valor_sensor2 == LOW){ //                             <- INTERRUPCION ENCODER LEER LINEAS
         lineas++;
       }

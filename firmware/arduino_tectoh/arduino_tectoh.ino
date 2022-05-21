@@ -5,7 +5,7 @@
 // https://www.arduino.cc/reference/en/libraries/timerthree
 #include <TimerThree.h>
 // https://www.arduino.cc/reference/en/libraries/timerfour
-#include <TimerFour.h>      // https://www.arduino.cc/reference/en/libraries/timerfour
+#include <TimerFour.h> 
 
 // LCD library: https://www.arduino.cc/reference/en/libraries/liquidcrystal/
 #include <LiquidCrystal.h>
@@ -48,22 +48,23 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 #define X_DIR_PIN 55        // DIR pin for the first stepper motor driver (axis X)
 #define X_ENABLE_PIN 38     // ENABLE pin for the first stepper motor driver (axis X)
 
-// ------------ Linear position sensor
+// ------------ Linear position sensor LPS
   
-#define LIN_ENC1_PIN  20  // Linear position encoder 1 pin
-#define LIN_ENC2_PIN  21  // PIN del canal B del encoder
+#define LPS_ENC1_PIN  20  // Linear position encoder 1 pin
+#define LPS_ENC2_PIN  21  // PIN del canal B del encoder
 
 // not used, just in the interrupt
-//int lin_enc1;          // Value of linear encoder channel 1
-int lin_enc2;          // Value of linear encoder channel 2
+//int lps_enc1;          // Value of linear encoder channel 1
+int lps_enc2;          // Value of linear position sensor (lps) encoder channel 2
 
-volatile int lineas = 0;    // Numero de lineas que lleva el experimento
-float avance_lineas = 0;    // Avance a partir del numero de lineas y su resolucion
+volatile int lps_line_cnt = 0;    // number of counted lines of the linear position sensor
+const float mm_per_lps_line = 0.160; // milimiters per line from linear pos sensor
+float lps_mm = 0;    // milimeters count by the linear position sensor (lps)
 
 bool fc_inic_X = true;      // Valor del final de carrera situacion al inicio del experimento
 bool fc_fin_X = true;       // Valor del final de carrera situacion al final del experimento
 
-int L = 400;                // Longitud del husillo, por lo que se trata de la distancia máxima que se puede llevar a cabo
+const int TOT_LEN = 400;    // leadscrew length in mm, maximum distance
 
 // VARIABLES MEDIDA TIEMPO 
 
@@ -103,7 +104,12 @@ int volatile estado = 0;              // Variables del estado
 
 byte lcd_rownum = 0; // a byte is enogh, 4 rows
 byte lcd_colnum = 0; // a byte is enough, 20 lines
-bool btn_en1, btn_en2, btn_enc, btn_en1_prev, btn_en2_prev ;       // Variables de lectura directa del codificador giratorio mecanico
+
+// LCD rotary encoder
+bool rot_enc1, rot_enc2;
+bool rot_enc1_prev, rot_enc2_prev;  // previous values
+bool rot_encpb;  // push button of the rotary encoder
+
 bool direccion = false;                                            // Direccion del codificador
 bool derecha, izquierda, pulsador = false;                         // Variables de lectura del codificador interpretadas
 int i = 0;                                                         // Contador de pulsos
@@ -160,8 +166,8 @@ void setup() {
   pinMode(X_MIN_PIN, INPUT_PULLUP);   // Endstop init position
   pinMode(X_MAX_PIN, INPUT_PULLUP);   // Endstop final position
  
-  pinMode (LIN_ENC1_PIN, INPUT);     // linear position sensor quadrature encoder 1
-  pinMode (LIN_ENC2_PIN, INPUT);     // linear position sensor quadrature encoder 2
+  pinMode (LPS_ENC1_PIN, INPUT);     // linear position sensor quadrature encoder 1
+  pinMode (LPS_ENC2_PIN, INPUT);     // linear position sensor quadrature encoder 2
 
   lcd.begin(LCD_NUMCOLS, LCD_NUMROWS);   // 20 columns x 4 lines
 
@@ -170,10 +176,6 @@ void setup() {
   pinMode(X_DIR_PIN  , OUTPUT);
   pinMode(X_ENABLE_PIN , OUTPUT);
 
-  btn_en1 , btn_en1_prev = digitalRead(ROT_ENC1_PIN);
-  btn_en2 , btn_en2_prev = digitalRead(ROT_ENC2_PIN);
-  btn_enc = digitalRead(ROT_ENCPB_PIN);
-
   lcd.createChar(0, empty);   // 0: numero de carácter; empty: matriz que contiene los pixeles del carácter
   lcd.createChar(1, full);    // 1: numero de carácter; full: matriz que contiene los pixeles del carácter
   lcd.createChar(2, micro);   // 2: numero de carácter; micro: matriz que contiene los pixeles del carácter
@@ -181,7 +183,7 @@ void setup() {
  
   digitalWrite(X_ENABLE_PIN , LOW);         // Habilitación a nivel bajo del motor paso a paso
 
-  attachInterrupt(digitalPinToInterrupt(LIN_ENC1_PIN), encoder, RISING);     // Función de la interrupcion del encoder
+  attachInterrupt(digitalPinToInterrupt(LPS_ENC1_PIN), encoder, RISING);     // Función de la interrupcion del encoder
 
   Timer3.initialize(1000000);              // Inicialización de la interrupcion del contador de segundos
   Timer3.attachInterrupt(Temporizador);    // Función de la interrupcion del contador de segundos
@@ -192,18 +194,18 @@ void setup() {
 
 void leer_encoder()
 {
-  btn_en1 = digitalRead(ROT_ENC1_PIN);
-  btn_en2 = digitalRead(ROT_ENC2_PIN);
+  rot_enc1 = digitalRead(ROT_ENC1_PIN);
+  rot_enc2 = digitalRead(ROT_ENC2_PIN);
   digitalWrite(X_DIR_PIN, direccion);
 
-  if (btn_en1 != btn_en1_prev || btn_en2 != btn_en2_prev)
+  if (rot_enc1 != rot_enc1_prev || rot_enc2 != rot_enc2_prev)
   {
-    if (btn_en2 == false & btn_en1 == false & btn_en2_prev == true & btn_en1_prev == false)
+    if (rot_enc2 == false & rot_enc1 == false & rot_enc2_prev == true & rot_enc1_prev == false)
     {
       derecha = true;
       izquierda = false;
     }
-    else if ( btn_en2 == false & btn_en1 == false & btn_en2_prev == false & btn_en1_prev == true )
+    else if ( rot_enc2 == false & rot_enc1 == false & rot_enc2_prev == false & rot_enc1_prev == true )
     {
       derecha = false;
       izquierda = true;
@@ -219,15 +221,15 @@ void leer_encoder()
     derecha = false;
     izquierda = false;
   }
-  btn_en1_prev = btn_en1;
-  btn_en2_prev = btn_en2;
+  rot_enc1_prev = rot_enc1;
+  rot_enc2_prev = rot_enc2;
 }
 
 void leer_pulso()
 {
-  btn_enc = digitalRead(ROT_ENCPB_PIN);
+  rot_encpb = digitalRead(ROT_ENCPB_PIN);
 
-  if (btn_enc == false) //Detector de flanco del pulsador
+  if (rot_encpb == false) //Detector de flanco del pulsador
   {
     i++;
   }
@@ -346,7 +348,7 @@ void DefinicionDeVariables()
           }
           break;
         case 1: //opción 2: ir sumando y restando de 1 en 1
-          if (derecha == true and di_X + 1 < L)
+          if (derecha == true and di_X + 1 < TOT_LEN)
           {
             di_X = di_X + 1;
             lcd.setCursor(12, 0);
@@ -364,7 +366,7 @@ void DefinicionDeVariables()
           }
           break;
         case 2: //opción 3: ir sumando y restando de 10 en 10
-          if (derecha == true and di_X + 10 < L)
+          if (derecha == true and di_X + 10 < TOT_LEN)
           {
             di_X = di_X + 10;
             lcd.setCursor(12, 0);
@@ -382,7 +384,7 @@ void DefinicionDeVariables()
           }
           break;
         default: //opción 4: ir sumando y restando de 100 en 100
-          if (derecha == true and di_X + 100 < L)
+          if (derecha == true and di_X + 100 < TOT_LEN)
           {
             di_X = di_X + 100;
             lcd.setCursor(12, 0);
@@ -439,7 +441,7 @@ void DefinicionDeVariables()
           }
           break;
         case 1: //opción 2: ir sumando y restando de 1 en 1
-          if (derecha == true and df_X + 1 < L)
+          if (derecha == true and df_X + 1 < TOT_LEN)
           {
             df_X = df_X + 1;
             lcd.setCursor(12, 1);
@@ -457,7 +459,7 @@ void DefinicionDeVariables()
           }
           break;
         case 2: //opción 3: ir sumando y restando de 10 en 10
-          if (derecha == true and df_X + 10 < L)
+          if (derecha == true and df_X + 10 < TOT_LEN)
           {
             df_X = df_X + 10;
             lcd.setCursor(12, 1);
@@ -475,7 +477,7 @@ void DefinicionDeVariables()
           }
           break;
         default: //opción 4: ir sumando y restando de 100 en 100
-          if (derecha == true and df_X + 100 < L)
+          if (derecha == true and df_X + 100 < TOT_LEN)
           {
             df_X = df_X + 100;
             lcd.setCursor(12, 1);
@@ -638,7 +640,7 @@ void experimento() {
        digitalWrite(X_DIR_PIN , LOW);
   }   
 
-// POSICION
+// POSITION
 
   if (inicio_experimento == 1) {
     
@@ -646,26 +648,27 @@ void experimento() {
     lcd.print("LINEAS: ");
 
     lcd.setCursor(7, 0);
-    lcd.print(lineas);
+    lcd.print(lps_line_cnt);
 
-    avance_lineas = 0.169*lineas;         // Resolucion de cada linea = 0.169 mm
+    // millimeters observed by linear position sensor
+    lps_mm = mm_per_lps_line*lps_line_cnt;
     
     lcd.setCursor(11, 0);
     lcd.print("->"); 
     lcd.setCursor(14, 0);
-    lcd.print(avance_lineas);
+    lcd.print(lps_mm);
     lcd.setCursor(18, 0);
     lcd.print("mm"); 
      
-      if (lineas <10 && lineas >=0){
+      if (lps_line_cnt <10 && lps_line_cnt >=0){
       lcd.setCursor(8, 0);
       lcd.print(" ");
       }
-      if (lineas <100 && lineas >=0){
+      if (lps_line_cnt <100 && lps_line_cnt >=0){
       lcd.setCursor(9, 0);
       lcd.print(" ");
       }
-      if (lineas <1000 && lineas >=0){
+      if (lps_line_cnt <1000 && lps_line_cnt >=0){
       lcd.setCursor(10, 0);
       lcd.print(" ");
       }
@@ -764,12 +767,13 @@ void MedioPaso() {
 void encoder() {
 
     if (inicio_experimento == 1 && fin == 0) {
-      lin_enc2 = digitalRead (LIN_ENC2_PIN);
-      if (lin_enc2 == LOW){
-        lineas++;
+      // linear position sensor encoder channel 2
+      lps_enc2 = digitalRead (LPS_ENC2_PIN); // linear position sensor encoder 
+      if (lps_enc2 == LOW){
+        lps_line_cnt++;
       }
       else{
-        lineas--;
+        lps_line_cnt--;
       }
     }
 }

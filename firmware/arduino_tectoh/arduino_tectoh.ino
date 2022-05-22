@@ -27,8 +27,10 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 
 // LCD size
 
-# define LCD_NUMCOLS 20  // 20 columns
-# define LCD_NUMROWS 4   // 4 rows
+#define LCD_NUMCOLS 20  // 20 columns
+#define LCD_NUMROWS 4   // 4 rows
+
+#define LCD_PARAMS_COL 12 // column where the parameters are drawn, the left side 
 
 // Rotary encoder of LCD
 #define ROT_ENC1_PIN 31    // Quadrature rotary encoder signal 1
@@ -65,6 +67,7 @@ bool endstop_x_ini;    // endstop value at x=0
 bool endstop_x_end;    // endstop value at the end
 
 const int TOT_LEN = 400;    // leadscrew length in mm, maximum distance
+const int MAX_VEL = 100;    // maximum velocity in mm/h
 
 // VARIABLES MEDIDA TIEMPO 
 
@@ -72,18 +75,23 @@ int horas = 0;              // Variable que cuenta las horas del experimento
 int minutos = 0;            // Variable que cuenta los minutos del experimento
 volatile int segundos = 0;  // Variable que cuenta los segundos del experimento
 
-// VARIABLES MOVIMIENTO MOTOR
+// Sandbox parameters
+
+// short are 16bits
+// Speed of the Sandbox in mm/h, from 1 to 100, making it short, to have negative
+// to make some operations
+short vel_mmh = 1;   // Speed of the Sandbox in mm/h, from 1 to 100
+short pos_x_ini = 0;  // Initial position of the gantry for the experiment
+short pos_x_end = 0;  // Final position of the gantry for the experiment
 
 unsigned long t_mediomicropaso = 0;   // Variable en la que introducimo el tiempo de cada medio micropaso
 unsigned long t_mediopaso = 0;        // Variable en la que introducimo el tiempo de cada medio paso
-byte vel_mmh = 1;                      // Speed of the Sandbox in mm/h, from 1 to 99
 volatile int nivel = LOW;             // Nivel del motor paso a paso
 unsigned long micropasos = 0;         // Numero de micropasos dados
 unsigned long n_mediospasos = 0;      // Numero de medios pasos cuando el experimento empieza en 0 mm
 volatile int n_mediospasos2 = 0;      // Numero de medios pasos cuando el experimento no empieza en 0 mm
 float avance_mediospasos = 0;         // Avance a partir de los medios pasos dados por el motor conocido su avance por cada medio paso cuando el experimento empieza en 0 mm
 float avance_mediospasos2 = 0;        // Avance a partir de los medios pasos dados por el motor conocido su avance por cada medio paso cuando el experimento no empieza en 0 mm
-int di_X, df_X = 0;                   // Distancia inicial y final que queremos en el experimento
 
 // El siguiente vector muestra los tiempos de cada medio micropaso dependiendo de la velocidad seleccionado. Este vector se encuentra en un .csv en el GitHub del autor del trabajo
 float vectort_mediomicropaso[] = {0,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,199.33,196.95,194.64,192.37,190.16,188.00,185.89,183.82,181.80,179.83,177.89,176.00,174.15,172.33,170.56,168.82,167.11,165.44};
@@ -92,23 +100,41 @@ float vectort_mediomicropaso[] = {0,200,200,200,200,200,200,200,200,200,200,200,
 float vectort_mediopaso[] = {0,529411.76,264705.88,176470.59,132352.94,105882.35,88235.29,75630.25,66176.47,58823.53,52941.18,48128.34,44117.65,40723.98,37815.13,35294.12,33088.24,31141.87,29411.76,27863.78,26470.59,25210.08,24064.17,23017.90,22058.82,21176.47,20361.99,19607.84,18907.56,18255.58,17647.06,17077.80,16544.12,16042.78,15570.93,15126.05,14705.88,14308.43,13931.89,13574.66,13235.29,12912.48,12605.04,12311.90,12032.09,11764.71,11508.95,11264.08,11029.41,10804.32,10588.24,10380.62,10181.00,9988.90,9803.92,9625.67,9453.78,9287.93,9127.79,8973.08,8823.53,8678.88,8538.90,8403.36,8272.06,8144.80,8021.39,7901.67,7785.47,7672.63,7563.03,7456.50,7352.94,7252.22,7154.21,7058.82,6965.94,6875.48,6787.33,6701.41,6617.65,6535.95,6456.24,6378.45,6302.52,6228.37,6155.95,6085.19,6016.04,5948.45,5882.35,5817.71,5754.48,5692.60,5632.04,5572.76,5514.71,5457.85,5402.16,5347.59,5294.12};
 
 
-// State values of the user interface
+// ---------------- FINITE STATE MACHINES (FSM)
+// There are 3:
+//  - ui_state: the main FSM of the user interface (UI),
+//               indicate the main activity
+//  - selparam_st: indicates which parameter is being changed
+//  - seldigit_st: indicates which digit is being changed
 
-enum st_ui_type { ST_INI,         // initial state, welcome
-                  //ST_MENU,        // Navigation through the menu
-                  ST_SET_PARAMS,  // Setting the parameters
-                  ST_RUNNING};    // Running the experiment
+#define   ST_INI        0   // initial state, welcome
+#define   ST_SEL_PARAMS 1   // Selecting the parameters
+#define   ST_SEL_DIGIT  2   // Selecting which digit to change
+#define   ST_SEL_VALUE  3   // Setting the digit value
+#define   ST_RUN        4   // Running the experiment
 
-int inicio = 0;                       // Variable que inicia el experimento cuando comienza en 0 mm
-int inicio_experimento = 0;           // Variable que inicia el experimento cuando no comienza en 0 mm
-int fin = 0;                          // Variable que para el experimento cuando llega al final de carrera 
+byte ui_state = ST_INI; 
 
-// before it was volatile, it doesnt seem to need to be volatile because its
-// value is not changed by interrupts
-st_ui_type ui_state = ST_INI; 
+// indicates what parameter are we changing, moving on rows
+#define   SELPARAM_X0    0   // changing the initial position
+#define   SELPARAM_XF    1   // changing the final position
+#define   SELPARAM_VEL   2   // changing the experiment velocity
+#define   SELPARAM_START 3   // start the experiment
+
+byte selparam_st = SELPARAM_X0;
+               
+// the column indicates the digit we are changing
+#define   SELDIG_PARAM   0    // go back to parameter select
+#define   SELDIG_100s    1    // changing the hundreds
+#define   SELDIG_TENS    2    // changing the tens
+#define   SELDIG_UNITS   3    // changing the units
+
+byte seldigit_st = SELDIG_PARAM; //default state, no change
 
 
-// LCD variables
+int inicio = 0;             // Variable que inicia el experimento cuando comienza en 0 mm
+int inicio_experimento = 0; // Variable que inicia el experimento cuando no comienza en 0 mm
+int fin = 0;           // Variable que para el experimento cuando llega al final de carrera 
 
 byte lcd_rownum = 0; // a byte is enogh, 4 rows
 byte lcd_colnum = 0; // a byte is enough, 20 lines
@@ -202,6 +228,110 @@ void setup() {
   
 }
 
+// ------ next ui state
+// simple function that calculates the next ui state depending on the 
+// rotation of the knob
+// we could have used the global variable, but instead we use arguments:
+// ui_state_arg
+// right, left (indicates if the nob is turned right or left
+
+byte nxt_ui_state(byte ui_state_arg, bool right, bool left)
+{
+  if (right == true) {
+    if (ui_state_arg == ST_RUN) {
+      ui_state_arg = ST_SEL_PARAMS;
+    } else {
+      ui_state_arg = ui_state_arg + 1;
+    }
+  } else if (left == true) {
+    if (ui_state_arg == ST_SEL_PARAMS) { // dont go back to ST_INI
+      ui_state_arg = ST_RUN;
+    } else {
+      ui_state_arg = ui_state_arg - 1;
+    }
+  }
+  return ui_state_arg;
+}
+
+// ------ next parameter
+// simple function that calculates the next parameter selection state
+// depending on the  rotation of the knob
+// we could have used the global variable, but instead we use arguments:
+// selparam_st_arg
+// right, left (indicates if the nob is turned right or left
+
+byte nxt_param(byte selparam_st_arg, bool right, bool left)
+{
+  if (right == true) {
+    if (selparam_st_arg == SELPARAM_START) {
+      selparam_st_arg = SELPARAM_X0;
+    } else {
+      selparam_st_arg = selparam_st_arg + 1;
+    }
+  } else if (left == true) {
+    if (selparam_st_arg == SELPARAM_X0) { 
+      selparam_st_arg = SELPARAM_START;
+    } else {
+      selparam_st_arg = selparam_st_arg - 1;
+    }
+  }
+  return selparam_st_arg;
+}
+
+// ------ next digit
+// simple function that calculates the next digit selection state
+// depending on the  rotation of the knob
+// we could have used the global variable, but instead we use arguments:
+// seldigit_st_arg
+// right, left (indicates if the nob is turned right or left
+
+byte nxt_digit(byte seldigit_st_arg, bool right, bool left)
+{
+  if (right == true) {
+    if (seldigit_st_arg == SELDIG_UNITS) {
+      seldigit_st_arg = SELDIG_PARAM;
+    } else {
+      seldigit_st_arg = seldigit_st_arg + 1;
+    }
+  } else if (left == true) {
+    if (seldigit_st_arg == SELDIG_PARAM) { 
+      seldigit_st_arg = SELDIG_UNITS;
+    } else {
+      seldigit_st_arg = seldigit_st_arg - 1;
+    }
+  }
+  return seldigit_st_arg;
+}
+
+// calculates the increment, depending on the knob rotation, and the digit
+short calc_incr(byte seldigit_st_arg, bool right, bool left)
+{
+  short increment = 0;
+
+  switch (seldigit_st_arg) {
+    case SELDIG_UNITS:
+      increment = 1;
+      break;
+    case SELDIG_TENS:
+      increment = 10;
+      break;
+    case SELDIG_100s:
+      increment = 100;
+      break;
+    default:
+      increment = 0;
+      break;
+  }
+  if (left == true) {
+    increment = - increment;
+  } else if (right == false) {
+    increment = 0; // no turn, no increment
+  }
+
+  return increment;
+
+}
+
 
 // -------------- lcdprint_rght
 // print an integer in the lcd aligned to the right
@@ -221,11 +351,11 @@ void lcdprint_rght (int number, int max_digit)
 
   //lcd.setCursor(col, row);
   for (index = 0; index < max_digit-1; index++) {
-    if (number > max_number) {
+    if (number >= max_number) {
       break;
     }
     max_number = int(max_number/10);
-    lcd.print(" ");
+    lcd.print("0");
   }  
   lcd.print(number);
 
@@ -316,30 +446,30 @@ void menu()
   lcd_rownum = 0;
   lcd_colnum = 0;
 
-  di_X = 0;
-  df_X = 0;
+  pos_x_ini = 0;
+  pos_x_end = 0;
   vel_mmh = 1;
 
   lcd.setCursor(1, 0);
-  lcd.print("dist.iniX");
+  lcd.print("Init posX");
   lcd.setCursor(12, 0);
-  lcdprint_rght(di_X,3);
+  lcdprint_rght(pos_x_ini,3);
   lcd.setCursor(18, 0);
   lcd.print("mm");
   lcd.setCursor(1, 1);
-  lcd.print("dist.finX");
+  lcd.print("End posX");
   lcd.setCursor(12, 1);
-  lcd.print(df_X);
+  lcdprint_rght(pos_x_end,3);
   lcd.setCursor(18, 1);
   lcd.print("mm");
   lcd.setCursor(1, 2);
-  lcd.print("velocidad");
+  lcd.print("velocity");
   lcd.setCursor(12, 2);
-  lcd.print(vel_mmh);
+  lcdprint_rght(vel_mmh,3);
   lcd.setCursor(16, 2);
   lcd.print("mm/h");
   lcd.setCursor(1, 3);
-  lcd.print("Iniciar experimento");
+  lcd.print("Start Experimet");
   lcd.setCursor(0, 0);
   lcd.write(byte(HOL_DIAM));
   lcd.setCursor(0, 1);
@@ -353,305 +483,6 @@ void menu()
   lcd.setCursor(0, lcd_rownum);
 }
 
-// set experiment parameters
-
-void set_params()
-{
-  // lcd_rownum indicates in which row we are -> which parameter we are modifying
-  // 0: Initial X
-  // 1: Final X
-  // 3: Speed
-  // 4: Start experiment
-  // lcd_colnum indicates what are we changing
-  // 0: the row -> the parameter
-  // 1: units
-  // 2: tens
-  // 3: hundreds
-  
-  switch (lcd_rownum)
-  {
-    case 0: // input initial X
-      // lcd_colnum is the column of the LCD, when 0, is at the left,
-      // and we can select up-down in the menu
-      if (rot_enc_pushed == true  and lcd_colnum < 3) 
-      {
-        lcd_colnum++;
-      }
-      else if (rot_enc_pushed == true and lcd_colnum == 3) // 4 places
-      {
-        lcd_colnum = 0;
-      }
-      switch (lcd_colnum)
-      {
-        case 0: // Parameter selection
-          if (rot_enc_rght == true )
-          {
-            lcd_rownum = 1;
-            lcd.setCursor(0, 0);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 1);
-            lcd.write(byte(FUL_DIAM));
-            lcd.setCursor(0, 2);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 3);
-            lcd.write(byte(HOL_DIAM));
-          }
-          else if (rot_enc_left == true)
-          {
-            lcd_rownum = 3;
-            lcd.setCursor(0, 0);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 1);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 2);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 3);
-            lcd.write(byte(FUL_DIAM));
-          }
-          break;
-        case 1: // add or dif in units
-          if (rot_enc_rght == true and di_X + 1 < TOT_LEN)
-          {
-            di_X = di_X + 1;
-          }
-          else if (rot_enc_left == true and di_X - 1 >= 0)
-          {
-            di_X = di_X - 1;
-          }
-          lcd.setCursor(12, 0);
-          lcdprint_rght(di_X, 3);
-          break;
-        case 2: //Add or dif in tens
-          if (rot_enc_rght == true and di_X + 10 < TOT_LEN)
-          {
-            di_X = di_X + 10;
-          }
-          else if (rot_enc_left == true and di_X - 10 >= 0)
-          {
-            di_X = di_X - 10;
-          }
-          lcd.setCursor(12, 0);
-          lcdprint_rght(di_X, 3);
-          break;
-        default: //add or sub in hundreds
-          if (rot_enc_rght == true and di_X + 100 < TOT_LEN)
-          {
-            di_X = di_X + 100;
-          }
-          else if (rot_enc_left == true and di_X - 100 >= 0)
-          {
-            di_X = di_X - 100;
-          }
-          lcd.setCursor(12, 0);
-          lcdprint_rght(di_X, 3);
-          break;
-      }
-      break;
-    case 1: // modificar la distancia final
-      // lcd_colnum is the column of the LCD, when 0, is at the left,
-      // and we can select up-down in the menu
-      if (rot_enc_pushed == true  and lcd_colnum < 3) 
-      {
-        lcd_colnum++;
-      }
-      else if (rot_enc_pushed == true and lcd_colnum == 3)
-      {
-        lcd_colnum = 0;
-      }
-      switch (lcd_colnum)
-      {
-        case 0: //opción 1: seleccionar variable
-          if (rot_enc_rght == true )
-          {
-            lcd_rownum = 2;
-            lcd.setCursor(0, 0);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 1);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 2);
-            lcd.write(byte(FUL_DIAM));
-            lcd.setCursor(0, 3);
-            lcd.write(byte(HOL_DIAM));
-          }
-          else if (rot_enc_left == true)
-          {
-            lcd_rownum = 0;
-            lcd.setCursor(0, 0);
-            lcd.write(byte(FUL_DIAM));
-            lcd.setCursor(0, 1);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 2);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 3);
-            lcd.write(byte(HOL_DIAM));
-          }
-          break;
-        case 1: //opción 2: ir sumando y restando de 1 en 1
-          if (rot_enc_rght == true and df_X + 1 < TOT_LEN)
-          {
-            df_X = df_X + 1;
-            lcd.setCursor(12, 1);
-            lcd.print("   ");
-            lcd.setCursor(12, 1);
-            lcd.print(df_X);
-          }
-          else if (rot_enc_left == true and df_X - 1 >= 0)
-          {
-            df_X = df_X - 1;
-            lcd.setCursor(12, 1);
-            lcd.print("   ");
-            lcd.setCursor(12, 1);
-            lcd.print(df_X);
-          }
-          break;
-        case 2: //opción 3: ir sumando y restando de 10 en 10
-          if (rot_enc_rght == true and df_X + 10 < TOT_LEN)
-          {
-            df_X = df_X + 10;
-            lcd.setCursor(12, 1);
-            lcd.print("   ");
-            lcd.setCursor(12, 1);
-            lcd.print(df_X);
-          }
-          else if (rot_enc_left == true and df_X - 10 >= 0)
-          {
-            df_X = df_X - 10;
-            lcd.setCursor(12, 1);
-            lcd.print("   ");
-            lcd.setCursor(12, 1);
-            lcd.print(df_X);
-          }
-          break;
-        default: //opción 4: ir sumando y restando de 100 en 100
-          if (rot_enc_rght == true and df_X + 100 < TOT_LEN)
-          {
-            df_X = df_X + 100;
-            lcd.setCursor(12, 1);
-            lcd.print("   ");
-            lcd.setCursor(12, 1);
-            lcd.print(df_X);
-          }
-          else if (rot_enc_left == true and df_X - 100 >= 0)
-          {
-            df_X = df_X - 100;
-            lcd.setCursor(12, 1);
-            lcd.print("   ");
-            lcd.setCursor(12, 1);
-            lcd.print(df_X);
-          }
-          break;
-      }
-      break;
-    case 2: // modificar la velocidad
-      // lcd_colnum is the column of the LCD, when 0, is at the left,
-      // and we can select up-down in the menu
-      if (rot_enc_pushed == true  and lcd_colnum < 1)
-      {
-        lcd_colnum++;
-      }
-      else if (rot_enc_pushed == true and lcd_colnum == 1) //hay 2 opciones
-      {
-        lcd_colnum = 0;
-      }
-      switch (lcd_colnum)
-      {
-        case 0: //opción 1: seleccionar variable
-          if (rot_enc_rght == true )
-          {
-            lcd_rownum = 3;
-            lcd.setCursor(0, 0);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 1);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 2);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 3);
-            lcd.write(byte(FUL_DIAM));
-          }
-          else if (rot_enc_left == true)
-          {
-            lcd_rownum = 1;
-            lcd.setCursor(0, 0);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 1);
-            lcd.write(byte(FUL_DIAM));
-            lcd.setCursor(0, 2);
-            lcd.write(byte(HOL_DIAM));
-            lcd.setCursor(0, 3);
-            lcd.write(byte(HOL_DIAM));
-          }
-          break;
-        default: // opción 2: modificar la velocidad de 1 en 1 o de 10 en 10 en función de la velocidad
-          if (rot_enc_left == true and vel_mmh - 1 >= 0)
-          {
-              vel_mmh = vel_mmh - 1;
-              lcd.setCursor(12, 2);
-              lcd.print(vel_mmh);
-          }
-          else if (rot_enc_rght == true and vel_mmh < 100)
-          {
-              vel_mmh = vel_mmh + 1;
-              lcd.setCursor(12, 2);
-              lcd.print(vel_mmh);
-          }
-          
-        if (vel_mmh <10 && vel_mmh >=0){
-        lcd.setCursor(13, 2);
-        lcd.print(" ");
-        }
-        if (vel_mmh <100 && vel_mmh >=0){
-        lcd.setCursor(14, 2);
-        lcd.print(" ");
-        }
-          
-          break;
-      }
-      break;
-      
-    default: // start experiment
-    
-      if (rot_enc_pushed == true)
-      {
-          t_mediomicropaso = ((unsigned long)vectort_mediomicropaso[vel_mmh]);     
-          Timer1.attachInterrupt(Micropasos);             // Funcion de la interrupcion de los micropasos
-          Timer1.initialize(t_mediomicropaso);            // Inicializacion de la interrupcion de los micropasos
-          Timer4.attachInterrupt(MedioPaso);              // Funcion de la interrupcion de los medios pasos
-          t_mediopaso = ((unsigned long)(vectort_mediopaso[vel_mmh]));  
-          Timer4.initialize(t_mediopaso);                 // Inicializacion de la interrupcion de los medios pasos
-         
-          lcd.clear();
-          ui_state = ST_RUNNING;
-        
-      }
-      else if (rot_enc_rght == true )
-      {
-        lcd_rownum = 0;
-        lcd_colnum = 0;
-        lcd.setCursor(0, 0);
-        lcd.write(byte(FUL_DIAM));
-        lcd.setCursor(0, 1);
-        lcd.write(byte(HOL_DIAM));
-        lcd.setCursor(0, 2);
-        lcd.write(byte(HOL_DIAM));
-        lcd.setCursor(0, 3);
-        lcd.write(byte(HOL_DIAM));
-      }
-      else if (rot_enc_left == true)
-      {
-        lcd_rownum = 2;
-        lcd_colnum = 0;
-        lcd.setCursor(0, 0);
-        lcd.write(byte(HOL_DIAM));
-        lcd.setCursor(0, 1);
-        lcd.write(byte(HOL_DIAM));
-        lcd.setCursor(0, 2);
-        lcd.write(byte(FUL_DIAM));
-        lcd.setCursor(0, 3);
-        lcd.write(byte(HOL_DIAM));
-      }
-      break;
-  }
-}
 
 //////////////// ESTADO 3 ////////////////
 
@@ -671,10 +502,10 @@ void experimento() {
   }
 
   if (inicio == 1) {
-    if (di_X == 0) {
+    if (pos_x_ini == 0) {
       inicio_experimento = 1;
     }
-    else if (di_X == (0.000147*n_mediospasos)) {
+    else if (pos_x_ini == (0.000147*n_mediospasos)) {
       inicio_experimento = 1;
     }
   }  
@@ -733,7 +564,7 @@ void experimento() {
     lcd.print("Avance: ");
     lcd.setCursor(7, 3);
     
-    if (di_X == 0){     
+    if (pos_x_ini == 0){     
     lcd.print(avance_mediospasos);}
     else{
     lcd.print(avance_mediospasos2);
@@ -752,7 +583,7 @@ void experimento() {
     lcd.setCursor(0, 1);
     lcd.print("A CERO");
     }
-  else if (inicio_experimento == 1 && fin ==0 && (avance_mediospasos < df_X)){  
+  else if (inicio_experimento == 1 && fin ==0 && (avance_mediospasos < pos_x_end)){  
       if (segundos == 60)    {
       segundos = 0;
       minutos++;           }
@@ -785,7 +616,7 @@ void Temporizador() {
 }
 
 void Micropasos() {
-    if (ui_state == ST_RUNNING && (avance_mediospasos < df_X) && fin == 0){
+    if (ui_state == ST_RUN && (avance_mediospasos < pos_x_end) && fin == 0){
       if (micropasos < 16){
         digitalWrite(X_STEP_PIN , nivel);
         if (nivel == LOW){       //                             <- INTERRUPCION MOVIMIENTO MOTOR TIEMPO MEDIO MICROPASO
@@ -802,11 +633,11 @@ void MedioPaso() {
   
   micropasos = 0;
   
-    if (inicio == 1 && fin ==0 && (avance_mediospasos < df_X)){ //        <- INTERRUPCION MOVIMIENTO MOTOR TIEMPO TOTAL MEDIO PASO
+    if (inicio == 1 && fin ==0 && (avance_mediospasos < pos_x_end)){ //        <- INTERRUPCION MOVIMIENTO MOTOR TIEMPO TOTAL MEDIO PASO
     n_mediospasos++;
     }
     
-    if (0.000147*n_mediospasos > di_X){
+    if (0.000147*n_mediospasos > pos_x_ini){
     n_mediospasos2++;
     }
 }
@@ -826,7 +657,103 @@ void encoder() {
     }
 }
 
+void update_menu() {
+
+  byte col, row;
+  static byte ui_state_prev = ST_SEL_PARAMS;
+  static byte selparam_st_prev = SELPARAM_X0;
+  static byte seldigit_st_prev = SELDIG_PARAM;
+  static short pos_x_ini_prev = 0;
+  static short pos_x_end_prev = 0;
+  static short vel_mmh_prev   = 1;  
+
+  if (ui_state > ST_INI && ui_state < ST_RUN) {
+    if (selparam_st != selparam_st_prev ) {
+      // draw all the hollow diamonds
+      lcd.setCursor(0, 0);
+      lcd.write(byte(HOL_DIAM));
+      lcd.setCursor(0, 1);
+      lcd.write(byte(HOL_DIAM));
+      lcd.setCursor(0, 2);
+      lcd.write(byte(HOL_DIAM));
+      lcd.setCursor(0, 3);
+      lcd.write(byte(HOL_DIAM));
+      lcd.setCursor(0, selparam_st); // the full diamond
+      lcd.write(byte(FUL_DIAM));
+    }  
+    if (ui_state != ui_state_prev ) {
+      switch (ui_state) {
+        case ST_SEL_PARAMS:
+          lcd.noCursor(); // no cursor when setting params
+          lcd.noBlink();  // no blink when setting params
+          break;
+        case ST_SEL_DIGIT:
+          lcd.cursor();  // cursor when selecting digits
+          lcd.noBlink(); // no blink when selecting digits
+          break;
+        case ST_SEL_VALUE:
+          lcd.cursor();  // cursor when selecting digits
+          lcd.blink();   // blink when selecting digits
+          break;
+        default:
+          lcd.noCursor(); // no cursor
+          lcd.noBlink();  // no blink
+          break;
+      }
+    }
+
+    switch (seldigit_st) {
+      case SELDIG_PARAM:
+        col = 0; // selection at first col (diamonds)
+        break;
+      case SELDIG_100s:
+        col = LCD_PARAMS_COL;
+        break;
+      case SELDIG_TENS:
+        col = LCD_PARAMS_COL+1;
+        break;
+      case SELDIG_UNITS:
+        col = LCD_PARAMS_COL+2;
+        break;
+    }
+    // draw the parameters if changed
+    if (pos_x_ini != pos_x_ini_prev) {
+      lcd.setCursor(LCD_PARAMS_COL, SELPARAM_X0);
+      lcdprint_rght(pos_x_ini,3); //3 is the number of digits
+    }
+    if (pos_x_end != pos_x_end_prev) {
+      lcd.setCursor(LCD_PARAMS_COL, SELPARAM_XF);
+      lcdprint_rght(pos_x_end,3); //3 is the number of digits
+    }
+    if (vel_mmh != vel_mmh_prev) {
+      lcd.setCursor(LCD_PARAMS_COL, SELPARAM_VEL);
+      lcdprint_rght(vel_mmh,3); //3 is the number of digits
+    }
+
+    if  ((ui_state_prev    != ui_state    ) ||
+         (selparam_st_prev != selparam_st ) ||
+         (seldigit_st_prev != seldigit_st ) ||
+         (pos_x_ini_prev   != pos_x_ini   ) ||
+         (pos_x_end_prev   != pos_x_end   ) ||
+         (vel_mmh_prev     != vel_mmh     )) {  
+      lcd.setCursor(col, selparam_st); //row is directly defined by selparam_st
+    }
+  }
+
+  // uptade previous values
+  ui_state_prev = ui_state;
+  selparam_st_prev = selparam_st;
+  seldigit_st_prev = seldigit_st;
+  pos_x_ini_prev = pos_x_ini;
+  pos_x_end_prev = pos_x_end;
+  vel_mmh_prev   = vel_mmh;  
+}
+
+
 void loop() {
+
+  short val_incr;
+  short aux_val;
   
   switch (ui_state){
     case ST_INI:
@@ -835,18 +762,121 @@ void loop() {
       if (rot_enc_pushed == true) { 
         lcd.clear();
         menu();
-        ui_state = ST_SET_PARAMS;
+        ui_state = ST_SEL_PARAMS;
       }
       break;
-    //case ST_MENU: // not needed
-      //break;
-    case ST_SET_PARAMS:
+    case ST_SEL_PARAMS: // Choosing between setting x0, xfin, vel, or start
+      update_menu();
       rot_enc_pushed = read_rot_encoder_pb();
-      read_rot_encoder_dir();
-      set_params();
+      if (rot_enc_pushed == true) {
+        // we go to select the digit, unless the parameter selected is to start
+        if (selparam_st == SELPARAM_START) {
+          ui_state = ST_RUN;
+          lcd.clear();
+        } else {
+          // when comming from ST_SEL_PARAMS, we start with the units
+          ui_state    = ST_SEL_DIGIT;
+          seldigit_st = SELDIG_UNITS; // start with units
+        }
+      } else {
+        read_rot_encoder_dir();
+        selparam_st = nxt_param(selparam_st, rot_enc_rght, rot_enc_left);
+      }
       break;
-   
-    case ST_RUNNING: 
+    case ST_SEL_DIGIT: // Choosing between the digit
+      update_menu();
+      rot_enc_pushed = read_rot_encoder_pb();
+      if (rot_enc_pushed == true) { // digit selected -> select value
+        if (seldigit_st == SELDIG_PARAM) { // go back to ST_SEL_PARAMS
+          ui_state = ST_SEL_PARAMS;
+        } else {
+          ui_state  = ST_SEL_VALUE;
+        }
+      } else { // knob not pushed
+        read_rot_encoder_dir();
+        seldigit_st = nxt_digit(seldigit_st, rot_enc_rght, rot_enc_left);
+      }
+      break;
+    case ST_SEL_VALUE: // Setting/selecting the digit value
+      update_menu();
+      rot_enc_pushed = read_rot_encoder_pb();
+      if (rot_enc_pushed == true) { // value selected, go back
+        // we can only be here if we are changing values (units, 10s, 100s)
+        // of X0, XF, VEL
+        ui_state = ST_SEL_DIGIT;
+      } else {
+        read_rot_encoder_dir();
+        val_incr = calc_incr(seldigit_st, rot_enc_rght, rot_enc_left);
+        if (rot_enc_rght == true) { // adding
+          switch (selparam_st) {
+            case SELPARAM_X0: // changing the initial position
+              aux_val = pos_x_ini + val_incr;
+              if (aux_val > TOT_LEN) {
+                pos_x_ini = TOT_LEN;
+              } else {
+                pos_x_ini = aux_val;
+              }
+              break;
+            case SELPARAM_XF: // changing the final position
+              aux_val = pos_x_end + val_incr;
+              if (aux_val > TOT_LEN) {
+                pos_x_end = TOT_LEN;
+              } else {
+                pos_x_end = aux_val;
+              }
+              break;
+            case SELPARAM_VEL: // changing the velocity
+              aux_val = vel_mmh + val_incr;
+              if (aux_val > MAX_VEL) {
+                vel_mmh = MAX_VEL;
+              } else {
+                vel_mmh = aux_val;
+              }
+              break;
+            default: // would be an error to be here
+              break;
+          }
+        } else if (rot_enc_left == true) { // substracting
+           switch (selparam_st) {
+            case SELPARAM_X0: // changing the initial position
+              aux_val = pos_x_ini + val_incr; // val_incr is negative
+              if (aux_val < 0) {
+                pos_x_ini = 0;
+              } else {
+                pos_x_ini = aux_val;
+              }
+              break;
+            case SELPARAM_XF: // changing the final position
+              aux_val = pos_x_end + val_incr;
+              if (aux_val < 0) {
+                pos_x_end = 0;
+              } else {
+                pos_x_end = aux_val;
+              }
+              break;
+            case SELPARAM_VEL: // changing the velocity
+              aux_val = vel_mmh + val_incr;
+              if (aux_val < 1) {
+                vel_mmh = 1;
+              } else {
+                vel_mmh = aux_val;
+              }
+              break;
+            default: // would be an error to be here
+              break;
+          }
+        }
+      }
+      break;
+    case ST_RUN: 
+      t_mediomicropaso = ((unsigned long)vectort_mediomicropaso[vel_mmh]);     
+      Timer1.attachInterrupt(Micropasos);             // Funcion de la interrupcion de los micropasos
+      Timer1.initialize(t_mediomicropaso);            // Inicializacion de la interrupcion de los micropasos
+      Timer4.attachInterrupt(MedioPaso);              // Funcion de la interrupcion de los medios pasos
+      t_mediopaso = ((unsigned long)(vectort_mediopaso[vel_mmh]));  
+      Timer4.initialize(t_mediopaso);                 // Inicializacion de la interrupcion de los medios pasos
+     
+      lcd.clear();
       experimento();
       break;    
   }

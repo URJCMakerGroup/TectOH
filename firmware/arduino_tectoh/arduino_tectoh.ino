@@ -136,8 +136,10 @@ byte selparam_st = SELPARAM_X0;
 byte seldigit_st = SELDIG_PARAM; //default state, no change
 
 
-bool homed = false;        // if the gantry has gone to the init endstop
-int inicio_experimento = 0; // Variable que inicia el experimento cuando no comienza en 0 mm
+// variables relative to the experiment
+bool exp_homed = false;     // if the gantry has gone to the init endstop (home)
+// if the gantry has pass to the init experiment X (after homing)
+bool exp_pass_init = false;
 int fin = 0;           // Variable que para el experimento cuando llega al final de carrera 
 
 // LCD rotary encoder
@@ -493,25 +495,25 @@ void experimento() {
   endstop_x_end = digitalRead(X_MAX_PIN);
   
   if (endstop_x_ini == HIGH ) {
-    homed = 1;
+    exp_homed = 1;
   }
 
   if (endstop_x_end == HIGH ) {
     fin = 1;
   }
 
-  if (homed == true) {
+  if (exp_homed == true) {
     if (pos_x_ini == 0) {
-      inicio_experimento = 1;
+      exp_pass_init = true;
     }
     else if (pos_x_ini == (ADVAN_HSTEP * tot_halfstep_cnt)) {
-      inicio_experimento = 1;
+      exp_pass_init = true;
     }
   }  
 
 // MOVIMIENTO MOTOR
 
-  if (homed == true && fin == 0) {  
+  if (exp_homed == true && fin == 0) {  
     digitalWrite(X_DIR_PIN , HIGH);
   }
   else { 
@@ -520,10 +522,10 @@ void experimento() {
 
 // POSITION
 
-  if (inicio_experimento == 1) {
+  if (exp_pass_init == true) {
     
     lcd.setCursor(0, 0);
-    lcd.print("LINEAS: ");
+    lcd.print("LINES: ");
 
     lcd.setCursor(7, 0);
     lcd.print(lps_line_cnt);
@@ -538,21 +540,21 @@ void experimento() {
     lcd.setCursor(18, 0);
     lcd.print("mm"); 
      
-      if (lps_line_cnt <10 && lps_line_cnt >=0){
+    if (lps_line_cnt <10 && lps_line_cnt >=0){
       lcd.setCursor(8, 0);
       lcd.print(" ");
-      }
-      if (lps_line_cnt <100 && lps_line_cnt >=0){
+    }
+    if (lps_line_cnt <100 && lps_line_cnt >=0){
       lcd.setCursor(9, 0);
       lcd.print(" ");
-      }
-      if (lps_line_cnt <1000 && lps_line_cnt >=0){
+    }
+    if (lps_line_cnt <1000 && lps_line_cnt >=0){
       lcd.setCursor(10, 0);
       lcd.print(" ");
-      }
+    }
     
     lcd.setCursor(0, 2);
-    lcd.print("Mediospasos: ");
+    lcd.print("Halfsteps: ");
     lcd.setCursor(12, 2);    
     lcd.print(tot_halfstep_cnt);
 
@@ -564,9 +566,9 @@ void experimento() {
     lcd.setCursor(7, 3);
     
     if (pos_x_ini == 0){     
-    lcd.print(absol_pos_mm);}
-    else{
-    lcd.print(relat_pos_mm);
+      lcd.print(absol_pos_mm);
+    } else {
+      lcd.print(relat_pos_mm);
     }
     
     lcd.setCursor(11, 3);
@@ -576,31 +578,34 @@ void experimento() {
   
 // TIEMPO 
   
-  if (homed == false && fin ==0) {
+  if (exp_homed == false && fin == 0) {
     lcd.setCursor(0, 0);
-    lcd.print("MOVIENDO");
-    lcd.setCursor(0, 1);
-    lcd.print("A CERO");
-  } else if (inicio_experimento == 1 && fin ==0 && (absol_pos_mm < pos_x_end)){  
-      if (sec_cnt == 60)    {
-      sec_cnt = 0;
-      minute_cnt ++;           }
-      if (minute_cnt == 60)     {
-      minute_cnt = 0;
-      hour_cnt ++;             }
+    lcd.print("HOMING");
+  } else if (exp_pass_init == true && fin ==0 && (absol_pos_mm < pos_x_end)){  
+      if (sec_cnt == 60)  {
+        sec_cnt = 0;
+        minute_cnt ++;
+      }
+      if (minute_cnt == 60) {
+        minute_cnt = 0;
+        hour_cnt ++;
+      }
       lcd.setCursor(0, 1);
-      if (hour_cnt < 10)        {
-      lcd.print("0");      }
+      if (hour_cnt < 10) {
+        lcd.print("0");
+      }
       lcd.print(hour_cnt);
       lcd.print(":");
       lcd.setCursor(3, 1);
-      if (minute_cnt < 10)      {
-      lcd.print("0");      }
+      if (minute_cnt < 10) {
+        lcd.print("0");
+      }
       lcd.print(minute_cnt);
       lcd.print(":");
       lcd.setCursor(6, 1);
-      if (sec_cnt < 10)     {
-      lcd.print("0");        }
+      if (sec_cnt < 10) {
+        lcd.print("0");
+      }
       lcd.print(sec_cnt);
     }
 }
@@ -610,7 +615,7 @@ void experimento() {
 
 void SecondsCounter() {
   
-  if (inicio_experimento == 1 && fin ==0) {
+  if (exp_pass_init == true && fin ==0) {
     sec_cnt ++;
   }
   
@@ -640,7 +645,7 @@ void gen_usteps() {
 void MedioPaso() {
   usteps_cnt = 0; // initialize the ustpes
   
-  if (homed == true && fin ==0 && (absol_pos_mm < pos_x_end)){ 
+  if (exp_homed == true && fin ==0 && (absol_pos_mm < pos_x_end)){ 
     tot_halfstep_cnt ++;
   }
     
@@ -655,7 +660,7 @@ void encoder() {
     //int lps_enc1;          // Value of linear encoder channel 1
     byte lps_enc2;          // Value of linear position sensor (lps) encoder channel 2
 
-    if (inicio_experimento == 1 && fin == 0) {
+    if (exp_pass_init == true && fin == 0) {
       // linear position sensor encoder channel 2
       lps_enc2 = digitalRead (LPS_ENC2_PIN); // linear position sensor encoder 
       if (lps_enc2 == LOW){

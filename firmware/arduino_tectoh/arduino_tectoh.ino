@@ -38,7 +38,10 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 #define ROT_ENCPB_PIN 35   // Rotary encoder push button
 
 // Beeper
-// #define BEEPER_PIN 33
+//#define LCD_BEEPER_PIN 33
+
+// LCD stop / kill button
+#define LCD_STOP_PIN 41
 
 // ----------- Endstops 
 #define X_MIN_PIN 3         // INIT endstop x=0 (True when pressed)
@@ -55,25 +58,29 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 #define LPS_ENC1_PIN  20  // Linear position encoder 1 pin
 #define LPS_ENC2_PIN  21  // PIN del canal B del encoder
 
-// not used, just in the interrupt
-//int lps_enc1;          // Value of linear encoder channel 1
-int lps_enc2;          // Value of linear position sensor (lps) encoder channel 2
 
 volatile int lps_line_cnt = 0;    // number of counted lines of the linear position sensor
 const float mm_per_lps_line = 0.160; // milimiters per line from linear pos sensor
 float lps_mm = 0;    // milimeters count by the linear position sensor (lps)
 
-bool endstop_x_ini;    // endstop value at x=0
-bool endstop_x_end;    // endstop value at the end
 
 const int TOT_LEN = 400;    // leadscrew length in mm, maximum distance
 const int MAX_VEL = 100;    // maximum velocity in mm/h
 
-// VARIABLES MEDIDA TIEMPO 
+const int LEAD = 3;  // lead screw lead in mm. How many mm advances per revolution
+const int STEP_REV = 200; // how many steps per revolution the motor has
+const int HSTEP_REV = 2 * STEP_REV; // halfsteps per revolution
 
-int horas = 0;              // Variable que cuenta las horas del experimento
-int minutos = 0;            // Variable que cuenta los minutos del experimento
-volatile int segundos = 0;  // Variable que cuenta los segundos del experimento
+const float GEAR_R = 51.0; // gear ratio of the motor
+
+//advance in mm per halfstep
+const float ADVAN_HSTEP = float(LEAD) / (HSTEP_REV * GEAR_R);
+
+// ---- variables for keeping track the experiment timing
+
+short hour_cnt = 0;        // Keep track of the number of hours of the experiment
+byte minute_cnt = 0;       // Keep track of the number of minutes of the experiment
+volatile byte sec_cnt = 0; // Keep track of the number of seconds of the experiment
 
 // Sandbox parameters
 
@@ -84,20 +91,17 @@ short vel_mmh = 1;   // Speed of the Sandbox in mm/h, from 1 to 100
 short pos_x_ini = 0;  // Initial position of the gantry for the experiment
 short pos_x_end = 0;  // Final position of the gantry for the experiment
 
-unsigned long t_mediomicropaso = 0;   // Variable en la que introducimo el tiempo de cada medio micropaso
-unsigned long t_mediopaso = 0;        // Variable en la que introducimo el tiempo de cada medio paso
-volatile int nivel = LOW;             // Nivel del motor paso a paso
-unsigned long micropasos = 0;         // Numero de micropasos dados
-unsigned long n_mediospasos = 0;      // Numero de medios pasos cuando el experimento empieza en 0 mm
-volatile int n_mediospasos2 = 0;      // Numero de medios pasos cuando el experimento no empieza en 0 mm
-float avance_mediospasos = 0;         // Avance a partir de los medios pasos dados por el motor conocido su avance por cada medio paso cuando el experimento empieza en 0 mm
-float avance_mediospasos2 = 0;        // Avance a partir de los medios pasos dados por el motor conocido su avance por cada medio paso cuando el experimento no empieza en 0 mm
+byte usteps_cnt = 0;    // Number of usteps 0 to 15
+volatile unsigned long tot_halfstep_cnt = 0;  // Number of half steps, from pos  0
+volatile unsigned long halfstep_cnt = 0;     // Number of half steps, from initial position
+float absol_pos_mm = 0;     // position from the x=0 in mm, absolute position
+float relat_pos_mm = 0;     // position from the initial position of the experimet, relative
 
 // El siguiente vector muestra los tiempos de cada medio micropaso dependiendo de la velocidad seleccionado. Este vector se encuentra en un .csv en el GitHub del autor del trabajo
-float vectort_mediomicropaso[] = {0,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,199.33,196.95,194.64,192.37,190.16,188.00,185.89,183.82,181.80,179.83,177.89,176.00,174.15,172.33,170.56,168.82,167.11,165.44};
+float array_t_half_ustep[] = {0,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,199.33,196.95,194.64,192.37,190.16,188.00,185.89,183.82,181.80,179.83,177.89,176.00,174.15,172.33,170.56,168.82,167.11,165.44};
 
 // El siguiente vector muestra los tiempos de cada medio paso dependiendo de la velocidad seleccionado. Este vector se encuentra en un .csv en el GitHub del autor del trabajo
-float vectort_mediopaso[] = {0,529411.76,264705.88,176470.59,132352.94,105882.35,88235.29,75630.25,66176.47,58823.53,52941.18,48128.34,44117.65,40723.98,37815.13,35294.12,33088.24,31141.87,29411.76,27863.78,26470.59,25210.08,24064.17,23017.90,22058.82,21176.47,20361.99,19607.84,18907.56,18255.58,17647.06,17077.80,16544.12,16042.78,15570.93,15126.05,14705.88,14308.43,13931.89,13574.66,13235.29,12912.48,12605.04,12311.90,12032.09,11764.71,11508.95,11264.08,11029.41,10804.32,10588.24,10380.62,10181.00,9988.90,9803.92,9625.67,9453.78,9287.93,9127.79,8973.08,8823.53,8678.88,8538.90,8403.36,8272.06,8144.80,8021.39,7901.67,7785.47,7672.63,7563.03,7456.50,7352.94,7252.22,7154.21,7058.82,6965.94,6875.48,6787.33,6701.41,6617.65,6535.95,6456.24,6378.45,6302.52,6228.37,6155.95,6085.19,6016.04,5948.45,5882.35,5817.71,5754.48,5692.60,5632.04,5572.76,5514.71,5457.85,5402.16,5347.59,5294.12};
+float array_t_half_step[] = {0,529411.76,264705.88,176470.59,132352.94,105882.35,88235.29,75630.25,66176.47,58823.53,52941.18,48128.34,44117.65,40723.98,37815.13,35294.12,33088.24,31141.87,29411.76,27863.78,26470.59,25210.08,24064.17,23017.90,22058.82,21176.47,20361.99,19607.84,18907.56,18255.58,17647.06,17077.80,16544.12,16042.78,15570.93,15126.05,14705.88,14308.43,13931.89,13574.66,13235.29,12912.48,12605.04,12311.90,12032.09,11764.71,11508.95,11264.08,11029.41,10804.32,10588.24,10380.62,10181.00,9988.90,9803.92,9625.67,9453.78,9287.93,9127.79,8973.08,8823.53,8678.88,8538.90,8403.36,8272.06,8144.80,8021.39,7901.67,7785.47,7672.63,7563.03,7456.50,7352.94,7252.22,7154.21,7058.82,6965.94,6875.48,6787.33,6701.41,6617.65,6535.95,6456.24,6378.45,6302.52,6228.37,6155.95,6085.19,6016.04,5948.45,5882.35,5817.71,5754.48,5692.60,5632.04,5572.76,5514.71,5457.85,5402.16,5347.59,5294.12};
 
 
 // ---------------- FINITE STATE MACHINES (FSM)
@@ -132,19 +136,17 @@ byte selparam_st = SELPARAM_X0;
 byte seldigit_st = SELDIG_PARAM; //default state, no change
 
 
-int inicio = 0;             // Variable que inicia el experimento cuando comienza en 0 mm
-int inicio_experimento = 0; // Variable que inicia el experimento cuando no comienza en 0 mm
+// variables relative to the experiment
+bool exp_homed = false;     // if the gantry has gone to the init endstop (home)
+// if the gantry has pass to the init experiment X (after homing)
+bool exp_pass_init = false;
 int fin = 0;           // Variable que para el experimento cuando llega al final de carrera 
-
-byte lcd_rownum = 0; // a byte is enogh, 4 rows
-byte lcd_colnum = 0; // a byte is enough, 20 lines
 
 // LCD rotary encoder
 bool rot_enc1, rot_enc2;
 
 bool rot_enc_rght   = false;  // if LCD rotary encoder turned clocwise ->
 bool rot_enc_left   = false;  // if LCD rotary encoder turned counter cw <-
-bool rot_enc_pushed = false;  // if LCD rotary encoder pushed
 
 // New symbols
 
@@ -221,10 +223,12 @@ void setup() {
  
   digitalWrite(X_ENABLE_PIN , LOW);  // Stepper motor enable. Active-low
 
-  attachInterrupt(digitalPinToInterrupt(LPS_ENC1_PIN), encoder, RISING);     // Función de la interrupcion del encoder
+  // interrupt for the linear position sensor
+  attachInterrupt(digitalPinToInterrupt(LPS_ENC1_PIN), encoder, RISING);
 
-  Timer3.initialize(1000000);              // Inicialización de la interrupcion del contador de segundos
-  Timer3.attachInterrupt(Temporizador);    // Función de la interrupcion del contador de segundos
+  // interrupt for the counter of seconds, to keep track of the time 
+  Timer3.initialize(1000000);             // A million microseconds to count seconds
+  Timer3.attachInterrupt(SecondsCounter); // Second counter
   
 }
 
@@ -396,23 +400,26 @@ void read_rot_encoder_dir()
   rot_enc2_prev = rot_enc2;
 }
 
+// -------------------- rot_encoder_pushed ---------------
+// reads the value of the rotary encoder, true if pushed
+// compares with the last time it has been read
 
-bool read_rot_encoder_pb()
+bool rot_encoder_pushed()
 {
   // only read in the menu user interface, not during the experiment
 
   // static variables are only initilized the first time and keep their value
   // first time to true because it seems that initially is HIGH, maybe due
   // to de pull-up input
-  static bool rot_enc_pb_prev = true;
+  static byte rot_enc_pb_prev = HIGH;
 
 
-  bool   rot_enc_pb;  // push button of the rotary encoder
+  byte   rot_enc_pb;  // push button of the rotary encoder
   bool   pushed = false;
 
   rot_enc_pb = digitalRead(ROT_ENCPB_PIN);
 
-  if (rot_enc_pb == true && rot_enc_pb_prev == false) {
+  if (rot_enc_pb == HIGH && rot_enc_pb_prev == LOW) {
     pushed = true;
     delay(300);
   }
@@ -425,15 +432,14 @@ bool read_rot_encoder_pb()
 void init_screen()
 {
 
-  lcd.setCursor(7, 0);   // set cursor position in lcd_colnum 2 lcd_rownum 0
+  lcd.setCursor(7, 0);   // set cursor position in col 7 row 0
   lcd.print("TectOH");
-  lcd.setCursor(3, 1);    // set cursor position in lcd_colnum 3 lcd_rownum 1
+  lcd.setCursor(3, 1);   // set cursor position in col 3 row 1
   lcd.print("Open Hardware");
-  lcd.setCursor(2, 2);    // set cursor position in lcd_colnum 3 lcd_rownum 2
+  lcd.setCursor(2, 2);
   lcd.print("Tectonics Sanbox");
 
-
-  lcd.setCursor(0, 3);    // set cursor position in lcd_colnum 1 lcd_rownum 3
+  lcd.setCursor(0, 3);
   lcd.print("Press knob to start");
   
 }
@@ -443,9 +449,6 @@ void init_screen()
 
 void menu()
 {
-  lcd_rownum = 0;
-  lcd_colnum = 0;
-
   pos_x_ini = 0;
   pos_x_end = 0;
   vel_mmh = 1;
@@ -471,16 +474,13 @@ void menu()
   lcd.setCursor(1, 3);
   lcd.print("Start Experimet");
   lcd.setCursor(0, 0);
-  lcd.write(byte(HOL_DIAM));
+  lcd.write(byte(FUL_DIAM));
   lcd.setCursor(0, 1);
   lcd.write(byte(HOL_DIAM));
   lcd.setCursor(0, 2);
   lcd.write(byte(HOL_DIAM));
   lcd.setCursor(0, 3);
   lcd.write(byte(HOL_DIAM));
-  lcd.setCursor(0, lcd_rownum);
-  lcd.write(byte(FUL_DIAM));
-  lcd.setCursor(0, lcd_rownum);
 }
 
 
@@ -488,43 +488,44 @@ void menu()
 
 void experimento() {
 
+  byte endstop_x_ini;    // endstop value at x=0
+  byte endstop_x_end;    // endstop value at the end
+
   endstop_x_ini = digitalRead(X_MIN_PIN);
   endstop_x_end = digitalRead(X_MAX_PIN);
   
-  if (endstop_x_ini == true )
-  {
-    inicio = 1;
+  if (endstop_x_ini == HIGH ) {
+    exp_homed = 1;
   }
 
-  if (endstop_x_end == true )
-  {
+  if (endstop_x_end == HIGH ) {
     fin = 1;
   }
 
-  if (inicio == 1) {
+  if (exp_homed == true) {
     if (pos_x_ini == 0) {
-      inicio_experimento = 1;
+      exp_pass_init = true;
     }
-    else if (pos_x_ini == (0.000147*n_mediospasos)) {
-      inicio_experimento = 1;
+    else if (pos_x_ini == (ADVAN_HSTEP * tot_halfstep_cnt)) {
+      exp_pass_init = true;
     }
   }  
 
 // MOVIMIENTO MOTOR
 
-  if (inicio == 1 && fin == 0) {  
-       digitalWrite(X_DIR_PIN , HIGH);
+  if (exp_homed == true && fin == 0) {  
+    digitalWrite(X_DIR_PIN , HIGH);
   }
   else { 
-       digitalWrite(X_DIR_PIN , LOW);
+    digitalWrite(X_DIR_PIN , LOW);
   }   
 
 // POSITION
 
-  if (inicio_experimento == 1) {
+  if (exp_pass_init == true) {
     
     lcd.setCursor(0, 0);
-    lcd.print("LINEAS: ");
+    lcd.print("LINES: ");
 
     lcd.setCursor(7, 0);
     lcd.print(lps_line_cnt);
@@ -539,35 +540,35 @@ void experimento() {
     lcd.setCursor(18, 0);
     lcd.print("mm"); 
      
-      if (lps_line_cnt <10 && lps_line_cnt >=0){
+    if (lps_line_cnt <10 && lps_line_cnt >=0){
       lcd.setCursor(8, 0);
       lcd.print(" ");
-      }
-      if (lps_line_cnt <100 && lps_line_cnt >=0){
+    }
+    if (lps_line_cnt <100 && lps_line_cnt >=0){
       lcd.setCursor(9, 0);
       lcd.print(" ");
-      }
-      if (lps_line_cnt <1000 && lps_line_cnt >=0){
+    }
+    if (lps_line_cnt <1000 && lps_line_cnt >=0){
       lcd.setCursor(10, 0);
       lcd.print(" ");
-      }
+    }
     
     lcd.setCursor(0, 2);
-    lcd.print("Mediospasos: ");
+    lcd.print("Halfsteps: ");
     lcd.setCursor(12, 2);    
-    lcd.print(n_mediospasos);
+    lcd.print(tot_halfstep_cnt);
 
-    avance_mediospasos = (0.000147*n_mediospasos);   // Avance de cada medio paso del motor = 0.000147 mm, ya que el eje del motor tiene 3 mm/vuelta y una reduccion de 51
-    avance_mediospasos2 = (0.000147*n_mediospasos2);
+    absol_pos_mm = (ADVAN_HSTEP * tot_halfstep_cnt);   // each halfstep
+    relat_pos_mm = (ADVAN_HSTEP * halfstep_cnt);
 
     lcd.setCursor(0, 3);
     lcd.print("Avance: ");
     lcd.setCursor(7, 3);
     
     if (pos_x_ini == 0){     
-    lcd.print(avance_mediospasos);}
-    else{
-    lcd.print(avance_mediospasos2);
+      lcd.print(absol_pos_mm);
+    } else {
+      lcd.print(relat_pos_mm);
     }
     
     lcd.setCursor(11, 3);
@@ -577,75 +578,89 @@ void experimento() {
   
 // TIEMPO 
   
-  if (inicio == 0 && fin ==0) {
+  if (exp_homed == false && fin == 0) {
     lcd.setCursor(0, 0);
-    lcd.print("MOVIENDO");
-    lcd.setCursor(0, 1);
-    lcd.print("A CERO");
-    }
-  else if (inicio_experimento == 1 && fin ==0 && (avance_mediospasos < pos_x_end)){  
-      if (segundos == 60)    {
-      segundos = 0;
-      minutos++;           }
-      if (minutos == 60)     {
-      minutos = 0;
-      horas++;             }
+    lcd.print("HOMING");
+  } else if (exp_pass_init == true && fin ==0 && (absol_pos_mm < pos_x_end)){  
+      if (sec_cnt == 60)  {
+        sec_cnt = 0;
+        minute_cnt ++;
+      }
+      if (minute_cnt == 60) {
+        minute_cnt = 0;
+        hour_cnt ++;
+      }
       lcd.setCursor(0, 1);
-      if (horas < 10)        {
-      lcd.print("0");      }
-      lcd.print(horas);
+      if (hour_cnt < 10) {
+        lcd.print("0");
+      }
+      lcd.print(hour_cnt);
       lcd.print(":");
       lcd.setCursor(3, 1);
-      if (minutos < 10)      {
-      lcd.print("0");      }
-      lcd.print(minutos);
+      if (minute_cnt < 10) {
+        lcd.print("0");
+      }
+      lcd.print(minute_cnt);
       lcd.print(":");
       lcd.setCursor(6, 1);
-      if (segundos < 10)     {
-      lcd.print("0");        }
-      lcd.print(segundos);
+      if (sec_cnt < 10) {
+        lcd.print("0");
+      }
+      lcd.print(sec_cnt);
     }
 }
 
-void Temporizador() {
+
+// -------------- Interrupt function to count seconds
+
+void SecondsCounter() {
   
-  if (inicio_experimento == 1 && fin ==0) {//                             <- INTERRUPCION CRONOMETRO
-    segundos++;
+  if (exp_pass_init == true && fin ==0) {
+    sec_cnt ++;
   }
   
 }
 
-void Micropasos() {
-    if (ui_state == ST_RUN && (avance_mediospasos < pos_x_end) && fin == 0){
-      if (micropasos < 16){
-        digitalWrite(X_STEP_PIN , nivel);
-        if (nivel == LOW){       //                             <- INTERRUPCION MOVIMIENTO MOTOR TIEMPO MEDIO MICROPASO
-           nivel = HIGH;
-           micropasos++;}
-        else{
-           nivel = LOW;
-        }
+// -------------- Interrupt function to count the microsteps and generate
+// ------ the pulses for the motor
+
+void gen_usteps() {
+  static byte step_value = LOW;     // signal to send to stepper motor pin
+
+  if (ui_state == ST_RUN && (absol_pos_mm < pos_x_end) && fin == 0){
+    if (usteps_cnt < 16){
+      digitalWrite(X_STEP_PIN , step_value);
+      if (step_value == LOW){
+         step_value = HIGH;
+         usteps_cnt++;
+      } else{
+         step_value = LOW;
       }
     }
+  }
 }
 
+// -------------- Interrupt function to count the number of halfsteps
+
 void MedioPaso() {
+  usteps_cnt = 0; // initialize the ustpes
   
-  micropasos = 0;
-  
-    if (inicio == 1 && fin ==0 && (avance_mediospasos < pos_x_end)){ //        <- INTERRUPCION MOVIMIENTO MOTOR TIEMPO TOTAL MEDIO PASO
-    n_mediospasos++;
-    }
+  if (exp_homed == true && fin ==0 && (absol_pos_mm < pos_x_end)){ 
+    tot_halfstep_cnt ++;
+  }
     
-    if (0.000147*n_mediospasos > pos_x_ini){
-    n_mediospasos2++;
-    }
+  if (ADVAN_HSTEP * tot_halfstep_cnt > pos_x_ini){
+    halfstep_cnt ++;
+  }
 }
 
 // linear encoder interrupt to read lines
 void encoder() {
+    // not used, just in the interrupt
+    //int lps_enc1;          // Value of linear encoder channel 1
+    byte lps_enc2;          // Value of linear position sensor (lps) encoder channel 2
 
-    if (inicio_experimento == 1 && fin == 0) {
+    if (exp_pass_init == true && fin == 0) {
       // linear position sensor encoder channel 2
       lps_enc2 = digitalRead (LPS_ENC2_PIN); // linear position sensor encoder 
       if (lps_enc2 == LOW){
@@ -741,12 +756,12 @@ void update_menu() {
   }
 
   // uptade previous values
-  ui_state_prev = ui_state;
+  ui_state_prev    = ui_state;
   selparam_st_prev = selparam_st;
   seldigit_st_prev = seldigit_st;
-  pos_x_ini_prev = pos_x_ini;
-  pos_x_end_prev = pos_x_end;
-  vel_mmh_prev   = vel_mmh;  
+  pos_x_ini_prev    = pos_x_ini;
+  pos_x_end_prev    = pos_x_end;
+  vel_mmh_prev      = vel_mmh;  
 }
 
 
@@ -754,12 +769,15 @@ void loop() {
 
   short val_incr;
   short aux_val;
+  bool rot_enc_pushed;  // if LCD rotary encoder pushed
+  unsigned long t_half_ustep = 0;   // us that takes half of a microstep
+  unsigned long t_half_step = 0;    // us that takes a half step
   
   switch (ui_state){
     case ST_INI:
       init_screen();
-      rot_enc_pushed = read_rot_encoder_pb();
-      if (rot_enc_pushed == true) { 
+      rot_enc_pushed = rot_encoder_pushed();
+      if (rot_enc_pushed == HIGH) { 
         lcd.clear();
         menu();
         ui_state = ST_SEL_PARAMS;
@@ -767,8 +785,8 @@ void loop() {
       break;
     case ST_SEL_PARAMS: // Choosing between setting x0, xfin, vel, or start
       update_menu();
-      rot_enc_pushed = read_rot_encoder_pb();
-      if (rot_enc_pushed == true) {
+      rot_enc_pushed = rot_encoder_pushed();
+      if (rot_enc_pushed == HIGH) {
         // we go to select the digit, unless the parameter selected is to start
         if (selparam_st == SELPARAM_START) {
           ui_state = ST_RUN;
@@ -785,8 +803,8 @@ void loop() {
       break;
     case ST_SEL_DIGIT: // Choosing between the digit
       update_menu();
-      rot_enc_pushed = read_rot_encoder_pb();
-      if (rot_enc_pushed == true) { // digit selected -> select value
+      rot_enc_pushed = rot_encoder_pushed();
+      if (rot_enc_pushed == HIGH) { // digit selected -> select value
         if (seldigit_st == SELDIG_PARAM) { // go back to ST_SEL_PARAMS
           ui_state = ST_SEL_PARAMS;
         } else {
@@ -799,8 +817,8 @@ void loop() {
       break;
     case ST_SEL_VALUE: // Setting/selecting the digit value
       update_menu();
-      rot_enc_pushed = read_rot_encoder_pb();
-      if (rot_enc_pushed == true) { // value selected, go back
+      rot_enc_pushed = rot_encoder_pushed();
+      if (rot_enc_pushed == HIGH) { // value selected, go back
         // we can only be here if we are changing values (units, 10s, 100s)
         // of X0, XF, VEL
         ui_state = ST_SEL_DIGIT;
@@ -869,14 +887,17 @@ void loop() {
       }
       break;
     case ST_RUN: 
-      t_mediomicropaso = ((unsigned long)vectort_mediomicropaso[vel_mmh]);     
-      Timer1.attachInterrupt(Micropasos);             // Funcion de la interrupcion de los micropasos
-      Timer1.initialize(t_mediomicropaso);            // Inicializacion de la interrupcion de los micropasos
-      Timer4.attachInterrupt(MedioPaso);              // Funcion de la interrupcion de los medios pasos
-      t_mediopaso = ((unsigned long)(vectort_mediopaso[vel_mmh]));  
-      Timer4.initialize(t_mediopaso);                 // Inicializacion de la interrupcion de los medios pasos
-     
       lcd.clear();
+      t_half_ustep = ((unsigned long)array_t_half_ustep[vel_mmh]);     
+      // attach function for half micro steps interruption
+      Timer1.attachInterrupt(gen_usteps);     
+      Timer1.initialize(t_half_ustep);
+
+      // attach function for halfsteps interruption
+      Timer4.attachInterrupt(MedioPaso); 
+      t_half_step = ((unsigned long)(array_t_half_step[vel_mmh]));  
+      Timer4.initialize(t_half_step);
+     
       experimento();
       break;    
   }

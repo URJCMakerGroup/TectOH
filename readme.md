@@ -1,4 +1,4 @@
 # Tectonic Open Hardware (TectOH) Sandbox
 
 ## Firmware
-[Arduino code the Sandbox](./firmware)
+[Arduino code of the Sandbox](./firmware)

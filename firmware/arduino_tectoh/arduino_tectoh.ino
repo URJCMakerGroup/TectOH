@@ -108,7 +108,7 @@ short pos_x_eeprom;
 short vel_mmh = MAX_VEL;  // Speed of the Sandbox in mm/h, from 1 to 100
 short abs_dest = -1;  // absolute position of the destination, from x0 in mm
 short rel_dist = 0;  // relative position of the destination, from initial position
-bool  rel_dist_neg = 0;  // sign of rel_dist: 0: positive, 1: negative
+bool  rel_dist_neg = false;  // sign of rel_dist: 0: positive, 1: negative
 // relative position of the destination, from actual position, it is update when
 // actual position changes
 short rel_dest_updated = 0;
@@ -141,8 +141,9 @@ float array_t_half_step[] = {0,529411.76,264705.88,176470.59,132352.94,105882.35
 #define   ST_SEL_DIGIT  3   // Setting the digit
 #define   ST_SEL_VALUE  4   // Setting the digit value
 #define   ST_CONFIRM    5   // Confirming to start
-#define   ST_HOME       6   // Homing
+#define   ST_HOMING     6   // Homing
 #define   ST_RUN        7   // Running the experiment
+#define   ST_END        8   // Moving ended
 
 byte ui_state = ST_INI; 
 
@@ -169,6 +170,10 @@ byte selparam_st = SELPARAM_VEL;
 
 byte seldigit_st = SELDIG_PARAM; //default state, no change
 
+#define   CONFIRM_YES    0    // confirmation
+#define   CONFIRM_NO     1    // No confirmation
+
+byte confirm_st = CONFIRM_YES;
 
 // variables relative to the experiment
 bool exp_homed = false;     // if the gantry has gone to the init endstop (home)
@@ -359,7 +364,7 @@ short sign_neg (int num)
   }
 }
 
-// ------ next ui state
+// ------ next ui state. CAN BE DELETED
 // simple function that calculates the next ui state depending on the 
 // rotation of the knob
 // we could have used the global variable, but instead we use arguments:
@@ -369,14 +374,14 @@ short sign_neg (int num)
 byte nxt_ui_state(byte ui_state_arg, bool right, bool left)
 {
   if (right == true) {
-    if (ui_state_arg == ST_RUN) {
+    if (ui_state_arg == ST_END) {
       ui_state_arg = ST_SEL_PARAMS;
     } else {
       ui_state_arg = ui_state_arg + 1;
     }
   } else if (left == true) {
     if (ui_state_arg == ST_SEL_PARAMS) { // dont go back to ST_INI
-      ui_state_arg = ST_RUN;
+      ui_state_arg = ST_END;
     } else {
       ui_state_arg = ui_state_arg - 1;
     }
@@ -635,6 +640,7 @@ void experimento() {
     fin = 1;
   }
 
+  /*
   if (exp_homed == true) {
     if (pos_x_ini == 0) {
       exp_pass_init = true;
@@ -740,7 +746,7 @@ void experimento() {
         lcd.print("0");
       }
       lcd.print(sec_cnt);
-    }
+    }*/
 }
 
 
@@ -760,6 +766,7 @@ void SecondsCounter() {
 void gen_usteps() {
   static byte step_value = LOW;     // signal to send to stepper motor pin
 
+  /*
   if (ui_state == ST_RUN && (absol_pos_mm < pos_x_end) && fin == 0){
     if (usteps_cnt < 16){
       digitalWrite(X_STEP_PIN , step_value);
@@ -770,21 +777,21 @@ void gen_usteps() {
          step_value = LOW;
       }
     }
-  }
+  }*/
 }
 
 // -------------- Interrupt function to count the number of halfsteps
 
 void MedioPaso() {
   usteps_cnt = 0; // initialize the ustpes
-  
+  /*
   if (exp_homed == true && fin ==0 && (absol_pos_mm < pos_x_end)){ 
     tot_halfstep_cnt ++;
   }
     
   if (ADVAN_HSTEP * tot_halfstep_cnt > pos_x_ini){
     halfstep_cnt ++;
-  }
+  }*/
 }
 
 // linear encoder interrupt to read lines
@@ -848,7 +855,7 @@ void task_menu()
   lcd.print("Relative move");
 
   lcd.setCursor(10, 3);
-  lcd.print("| x: ");
+  lcd.print("|x:");
   if (pos_x_eeprom == -1) {
     lcd.print("  ?");
   } else {
@@ -895,6 +902,7 @@ void update_task_menu()
     lcd.setCursor(19, 3);
     lcdprint_endstops();
   }
+  task_st_prev = task_st;
 }
 
 
@@ -914,16 +922,16 @@ void param_menu ()
   }
 
   lcd.setCursor(1, 0);
-  lcd.print("Speed");
+  lcd.print("Speed:");
   lcd.setCursor(12, 0);
   lcdprint_rght(vel_mmh,3);
-  lcd.setCursor(18, 0);
+  lcd.setCursor(16, 0);
   lcd.print("mm/h");
 
   // -- row 1 
   lcd.setCursor(1, 1);
   if (task_st == TASK_HOME) {
-    lcd.print("Go Home:  x = 0 mm (absolute)");
+    lcd.print("Go Home:  x = 0 mm");
   } else {
     lcd.setCursor(0, 1);
     if (selparam_st == SELPARAM_DIST) {
@@ -931,7 +939,7 @@ void param_menu ()
     } else {
       lcd.write(byte(HOL_DIAM));
     }
-    lcd.print("Travel dist.");
+    lcd.print("Travel:");
     lcd.setCursor(11, 1);
     if (rel_dist_neg == true) {
       lcd.print("-");
@@ -964,22 +972,25 @@ void param_menu ()
   }
   lcd.setCursor(1, 3);
   lcd.print("Back");
-  lcd.write(byte(BACK_ARROW))
+  lcd.write(byte(BACK_ARROW));
 
   // aditional info:
   lcd.setCursor(10, 3);
-  lcd.print("| x: ");
+  lcd.print("|x:");
   if (pos_x_eeprom == -1) {
     lcd.print("  ?");
   } else {
     lcdprint_rght(pos_x_eeprom,3);
   }
-  lcd.print(" mm");
+  lcd.print("mm");
 
   // endstop print
   lcd.setCursor(19, 3);
   lcdprint_endstops();
 }
+
+
+
 
 void update_param_menu() {
 
@@ -988,6 +999,7 @@ void update_param_menu() {
   static byte selparam_st_prev = SELPARAM_VEL;
   static byte seldigit_st_prev = SELDIG_PARAM;
   static short rel_dist_prev = 0; // relative destination
+  static bool  rel_dist_neg_prev = false; // sign
   static short vel_mmh_prev  = MAX_VEL;  
 
   if (ui_state >= ST_SEL_PARAMS && ui_state <= ST_SEL_VALUE) {
@@ -1071,13 +1083,22 @@ void update_param_menu() {
         lcd.setCursor(LCD_PARAMS_COL, SELPARAM_DIST);
         lcdprint_rght(rel_dist,3); //3 is the number of digits
       }
+      if (rel_dist_neg != rel_dist_neg_prev) {
+        lcd.setCursor(col, SELPARAM_DIST);
+        if (rel_dist_neg == true) {
+          lcd.print("-");
+        } else {
+          lcd.print("+");          
+        }
+      }
     }
 
-    if  ((ui_state_prev    != ui_state    ) ||
-         (selparam_st_prev != selparam_st ) ||
-         (seldigit_st_prev != seldigit_st ) ||
-         (rel_dist_prev    != rel_dist    ) ||
-         (vel_mmh_prev     != vel_mmh     )) {  
+    if  ((ui_state_prev    != ui_state       ) ||
+         (selparam_st_prev != selparam_st    ) ||
+         (seldigit_st_prev != seldigit_st    ) ||
+         (rel_dist_prev    != rel_dist       ) ||
+         (rel_dist_neg_prev != rel_dist_neg  ) ||         
+         (vel_mmh_prev     != vel_mmh        )) {  
       lcd.setCursor(col, selparam_st); //row is directly defined by selparam_st
     }
   }
@@ -1087,8 +1108,111 @@ void update_param_menu() {
   selparam_st_prev = selparam_st;
   seldigit_st_prev = seldigit_st;
   rel_dist_prev    = rel_dist;
-  vel_mmh_prev      = vel_mmh;  
+  rel_dist_prev    = rel_dist;  
+  vel_mmh_prev     = vel_mmh;  
 }
+
+
+//----------- confirm_menu
+
+void confirm_menu ()
+{
+
+  lcd.clear();
+  // -- row 0
+
+  lcd.setCursor(1, 0);
+  lcd.print("Speed");
+  lcd.setCursor(12, 0);
+  lcdprint_rght(vel_mmh,3);
+  lcd.setCursor(18, 0);
+  lcd.print("mm/h");
+
+  // -- row 1 
+  lcd.setCursor(1, 1);
+  if (task_st == TASK_HOME) {
+    lcd.print("Go Home:  x = 0 mm");
+  } else {
+    lcd.setCursor(0, 1);
+    lcd.print("Travel dist.");
+    lcd.setCursor(11, 1);
+    if (rel_dist_neg == true) {
+      lcd.print("-");
+    } else {
+      lcd.print("+");
+    }
+    lcd.setCursor(12, 1);
+    lcdprint_rght(rel_dist,3);
+    lcd.setCursor(16, 1);
+    lcd.print("mm");
+  }
+
+  // -- row 2 GO
+  lcd.setCursor(0, 2);
+  if (confirm_st == CONFIRM_YES) {
+    lcd.write(byte(FUL_DIAM));
+  } else {
+    lcd.write(byte(HOL_DIAM));
+  }
+  lcd.setCursor(1, 2);
+  lcd.print("Start moving");
+
+  // -- row 3, go back
+  lcd.setCursor(0, 3);
+  if (confirm_st == CONFIRM_NO) {
+    lcd.write(byte(FUL_DIAM));
+  } else {
+    lcd.write(byte(HOL_DIAM));
+  }
+  lcd.setCursor(1, 3);
+  lcd.print("Cancel");
+  lcd.write(byte(BACK_ARROW));
+
+  // aditional info:
+  lcd.setCursor(10, 3);
+  lcd.print("|x:");
+  if (pos_x_eeprom == -1) {
+    lcd.print("  ?");
+  } else {
+    lcdprint_rght(pos_x_eeprom,3);
+  }
+  lcd.print("mm");
+
+  // endstop print
+  lcd.setCursor(19, 3);
+  lcdprint_endstops();
+}
+
+
+
+//----------- update_confirm_menu
+
+void update_confirm_menu ()
+{
+
+  // -- row 0
+
+  // -- row 1 
+
+  // -- row 2 GO
+  lcd.setCursor(0, 2);
+  if (confirm_st == CONFIRM_YES) {
+    lcd.write(byte(FUL_DIAM));
+  } else {
+    lcd.write(byte(HOL_DIAM));
+  }
+
+  // -- row 3, Cancel
+  lcd.setCursor(0, 3);
+  if (confirm_st == CONFIRM_NO) {
+    lcd.write(byte(FUL_DIAM));
+  } else {
+    lcd.write(byte(HOL_DIAM));
+  }
+
+}
+
+
 
 
 void loop() {
@@ -1107,7 +1231,7 @@ void loop() {
         // get the EEPROM value (only once)
         check_pos_x_eeprom();
         task_menu();
-        ui_state = ST_SEL_TASK
+        ui_state = ST_SEL_TASK;
       }
       break;
     case ST_SEL_TASK: // Choosing between going home or moving distance
@@ -1139,6 +1263,7 @@ void loop() {
             break;
           case SELPARAM_GO:
             ui_state = ST_CONFIRM;
+            confirm_menu();
             break;
           case SELPARAM_BACK:
             ui_state = ST_SEL_TASK;
@@ -1188,7 +1313,7 @@ void loop() {
               break;
             case SELPARAM_DIST: // changing the destination
               if (seldigit_st == SELDIG_SIGN) {
-                rel_dist_sign = ! rel_dist_sign;
+                rel_dist_neg = ! rel_dist_neg;
               } else {
                 aux_val = rel_dist + val_incr;
                 if (aux_val > TOT_LEN) {
@@ -1213,7 +1338,7 @@ void loop() {
               break;
             case SELPARAM_DIST: // changing the destination
               if (seldigit_st == SELDIG_SIGN) {
-                rel_dist_sign = ! rel_dist_sign;
+                rel_dist_neg = ! rel_dist_neg;
               } else {
                 aux_val = rel_dist + val_incr;
                 if (aux_val < 0) {
@@ -1231,9 +1356,47 @@ void loop() {
       update_param_menu();
       break;
     case ST_CONFIRM: 
+      rot_enc_pushed = rot_encoder_pushed();
+      if (rot_enc_pushed == true) { // confirmation or go back
+        if (confirm_st == CONFIRM_YES) {
+          if (task_st == TASK_HOME) {
+            ui_state = ST_HOMING;
+          } else {
+            ui_state = ST_RUN;
+          }
+        } else {
+          ui_state = ST_SEL_PARAMS;
+          param_menu();
+        }
+      } else {
+        read_rot_encoder_dir();
+        if (rot_enc_rght == true || rot_enc_left == true) {
+          // only 2 options
+          if (confirm_st == CONFIRM_YES) {
+            confirm_st = CONFIRM_NO;
+          } else {
+            confirm_st = CONFIRM_YES;
+          }
+          update_confirm_menu();
+        }
+      }
+
+    // AAA falta
+
+    case ST_HOMING: 
+      lcd.clear();
       t_half_ustep = ((unsigned long)array_t_half_ustep[vel_mmh]);     
+      // attach function for half micro steps interruption
+      Timer1.attachInterrupt(gen_usteps);     
+      Timer1.initialize(t_half_ustep);
 
-
+      // attach function for halfsteps interruption
+      Timer4.attachInterrupt(MedioPaso); 
+      t_half_step = ((unsigned long)(array_t_half_step[vel_mmh]));  
+      Timer4.initialize(t_half_step);
+     
+      experimento();
+      break;
 
     case ST_RUN: 
       lcd.clear();
@@ -1249,6 +1412,8 @@ void loop() {
      
       experimento();
       break;    
+    case ST_END:
+      break;
   }
   
 }

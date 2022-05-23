@@ -7,6 +7,16 @@
 // https://www.arduino.cc/reference/en/libraries/timerfour
 #include <TimerFour.h> 
 
+// https://docs.arduino.cc/learn/built-in-libraries/eeprom
+// The EEPROM memory keeps its value after powering off, it is very convenient
+// to hold the position because:
+//  - homing takes a lot of time due to the slow speeds
+//  - Setting up the experiment may require hours, so the gantry can be set
+//    to its position, then power off the Sandbox to setup the experiment, 
+//    and when it is ready, power it up, and start.
+//    Te gantry should not go home, because it would ruin the experimet
+#include <EEPROM.h>
+
 // LCD library: https://www.arduino.cc/reference/en/libraries/liquidcrystal/
 #include <LiquidCrystal.h>
 
@@ -44,8 +54,8 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 #define LCD_STOP_PIN 41
 
 // ----------- Endstops 
-#define X_MIN_PIN 3         // INIT endstop x=0 (True when pressed)
-#define X_MAX_PIN 2         // END endstop (True when pressed)
+#define X_MIN_PIN 3         // INIT endstop x=0 (HIGH when pressed)
+#define X_MAX_PIN 2         // END endstop (HIGH when pressed)
 
 
 // ------------ Stepper motor
@@ -63,6 +73,9 @@ volatile int lps_line_cnt = 0;    // number of counted lines of the linear posit
 const float mm_per_lps_line = 0.160; // milimiters per line from linear pos sensor
 float lps_mm = 0;    // milimeters count by the linear position sensor (lps)
 
+// --- endstop values
+byte endstop_x_ini;    // endstop value at x=0
+byte endstop_x_end;    // endstop value at the end
 
 const int TOT_LEN = 400;    // leadscrew length in mm, maximum distance
 const int MAX_VEL = 100;    // maximum velocity in mm/h
@@ -82,7 +95,12 @@ short hour_cnt = 0;        // Keep track of the number of hours of the experimen
 byte minute_cnt = 0;       // Keep track of the number of minutes of the experiment
 volatile byte sec_cnt = 0; // Keep track of the number of seconds of the experiment
 
-// Sandbox parameters
+// ----- Sandbox parameters
+
+// position of the gantry in mm, according to the value saved in the EEPROM
+short pos_x_eeprom;
+
+#define EEPROM_DIR 0  // memory address of the EEPROM where the gantry position is
 
 // short are 16bits
 // Speed of the Sandbox in mm/h, from 1 to 100, making it short, to have negative
@@ -148,12 +166,19 @@ bool rot_enc1, rot_enc2;
 bool rot_enc_rght   = false;  // if LCD rotary encoder turned clocwise ->
 bool rot_enc_left   = false;  // if LCD rotary encoder turned counter cw <-
 
-// New symbols
+// New symbols only 7
 
-# define HOL_DIAM    0
-# define FUL_DIAM    1
-# define MICRO       2
-# define BACK_ARROW  3
+#define HOL_DIAM     0
+#define FUL_DIAM     1
+#define MICRO        2
+#define HOL_HOL_BOX  3
+#define HOL_FUL_BOX  4
+#define FUL_HOL_BOX  5
+#define FUL_FUL_BOX  6
+
+//#define HOL_BOX      4
+//#define FUL_BOX      5
+//#define BACK_ARROW   3
 
 byte hol_diam[8] = // 0: hollow diamond
 {
@@ -196,6 +221,72 @@ byte back_arrow[8] =  // 3: back arrow (return)
   B01000,
 };
 
+byte hol_box[8] = // 4: hollow box
+{
+  B11111,
+  B10001,
+  B10001,
+  B10001,
+  B10001,
+  B10001,
+  B11111,
+};
+
+byte ful_box[8] = // 5: full box
+{
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+};
+
+byte hol_hol_box[8] = // 6: two hollow boxes
+{
+  B11111,
+  B10001,
+  B10001,
+  B11111,
+  B10001,
+  B10001,
+  B11111,
+};
+
+byte hol_ful_box[8] = // 7: one hollow one full box
+{
+  B11111,
+  B10001,
+  B10001,
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+};
+
+byte ful_hol_box[8] = // 8: one full and other hollow box
+{
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B10001,
+  B10001,
+  B11111,
+};
+
+byte ful_ful_box[8] = // 8: two full boxes
+{
+  B11111,
+  B11111,
+  B11111,
+  B00000,
+  B11111,
+  B11111,
+  B11111,
+};
+
 void setup() {
 
   pinMode(ROT_ENC1_PIN, INPUT_PULLUP);     // LCD rotary encoder 1
@@ -218,13 +309,20 @@ void setup() {
   // creation of new lcd characters
   lcd.createChar(HOL_DIAM, hol_diam); // 0: hollow diamond
   lcd.createChar(FUL_DIAM, ful_diam); // 1: full diamond
-  lcd.createChar(MICRO,    micro);    // 3: micro symbol
-  lcd.createChar(BACK_ARROW, back_arrow);  // 4: back arrow (return)
+  lcd.createChar(MICRO,    micro);    // 2: micro symbol
+  //lcd.createChar(BACK_ARROW, back_arrow); // 3: back arrow (return)
+  //lcd.createChar(HOL_BOX   , hol_box);  // 4: hollow box
+  //lcd.createChar(FUL_BOX   , ful_box);  // 5: full box
+  lcd.createChar(HOL_HOL_BOX, hol_hol_box); // 3: hollow + hollow box
+  lcd.createChar(HOL_FUL_BOX, hol_ful_box); // 4: hollow + full box
+
+  lcd.createChar(FUL_HOL_BOX, ful_hol_box); // 5: full + hollow box
+  lcd.createChar(FUL_FUL_BOX, ful_ful_box); // 6: full + full box
  
   digitalWrite(X_ENABLE_PIN , LOW);  // Stepper motor enable. Active-low
 
   // interrupt for the linear position sensor
-  attachInterrupt(digitalPinToInterrupt(LPS_ENC1_PIN), encoder, RISING);
+  attachInterrupt(digitalPinToInterrupt(LPS_ENC1_PIN), lin_encoder, RISING);
 
   // interrupt for the counter of seconds, to keep track of the time 
   Timer3.initialize(1000000);             // A million microseconds to count seconds
@@ -427,6 +525,31 @@ bool rot_encoder_pushed()
   return pushed;
 }
 
+// ---------- lcdprint_endstops
+// -- print the state of the endstops, the position in the LCD has to be
+// -- set before the function call
+
+void lcdprint_endstops()
+{
+  endstop_x_ini = digitalRead(X_MIN_PIN);
+  endstop_x_end = digitalRead(X_MAX_PIN);
+  
+  if (endstop_x_ini == HIGH) {
+    if (endstop_x_end == HIGH) {
+      lcd.write(byte(FUL_FUL_BOX));
+    } else {
+      lcd.write(byte(FUL_HOL_BOX));
+    }
+  } else {
+    if (endstop_x_end == HIGH) {
+      lcd.write(byte(HOL_FUL_BOX));
+    } else {
+      lcd.write(byte(HOL_HOL_BOX));
+    }
+  }
+}
+
+
 // ------ ST_INI: initial state
 
 void init_screen()
@@ -441,6 +564,10 @@ void init_screen()
 
   lcd.setCursor(0, 3);
   lcd.print("Press knob to start");
+
+  // print the state of the endstops
+  lcd.setCursor(19, 3);
+  lcdprint_endstops();
   
 }
 
@@ -618,8 +745,8 @@ void SecondsCounter() {
   if (exp_pass_init == true && fin ==0) {
     sec_cnt ++;
   }
-  
 }
+
 
 // -------------- Interrupt function to count the microsteps and generate
 // ------ the pulses for the motor
@@ -655,7 +782,7 @@ void MedioPaso() {
 }
 
 // linear encoder interrupt to read lines
-void encoder() {
+void lin_encoder() {
     // not used, just in the interrupt
     //int lps_enc1;          // Value of linear encoder channel 1
     byte lps_enc2;          // Value of linear position sensor (lps) encoder channel 2
@@ -682,7 +809,7 @@ void update_menu() {
   static short pos_x_end_prev = 0;
   static short vel_mmh_prev   = 1;  
 
-  if (ui_state > ST_INI && ui_state < ST_RUN) {
+  if (ui_state >= ST_SEL_PARAMS && ui_state <= ST_SEL_VALUE) {
     if (selparam_st != selparam_st_prev ) {
       // draw all the hollow diamonds
       lcd.setCursor(0, 0);
@@ -765,6 +892,31 @@ void update_menu() {
 }
 
 
+// ------------------------ check_pos_x_eeprom
+// -- get the value of the gantry position saved in EEPROM
+
+void check_pos_x_eeprom()
+{
+  endstop_x_ini = digitalRead(X_MIN_PIN);
+  endstop_x_end = digitalRead(X_MAX_PIN);
+ 
+  if (endstop_x_ini == HIGH) {
+    pos_x_eeprom = 0;
+    EEPROM.put(EEPROM_DIR, pos_x_eeprom);
+  } else if (endstop_x_end == HIGH) {
+    pos_x_eeprom = TOT_LEN; // AAA: this value has to be calculated
+    EEPROM.put(EEPROM_DIR, pos_x_eeprom);
+  } else { // not at the end or init
+    // get the value from the EEPROM
+    EEPROM.get(EEPROM_DIR, pos_x_eeprom);
+    if (pos_x_eeprom > 0 && pos_x_eeprom < TOT_LEN) {
+      // position ok
+    } else { // position not valid
+      pos_x_eeprom = -1;
+    }
+  }
+}
+
 void loop() {
 
   short val_incr;
@@ -772,12 +924,14 @@ void loop() {
   bool rot_enc_pushed;  // if LCD rotary encoder pushed
   unsigned long t_half_ustep = 0;   // us that takes half of a microstep
   unsigned long t_half_step = 0;    // us that takes a half step
-  
+
   switch (ui_state){
     case ST_INI:
       init_screen();
       rot_enc_pushed = rot_encoder_pushed();
       if (rot_enc_pushed == HIGH) { 
+        // get the EEPROM value (only once)
+        check_pos_x_eeprom();
         lcd.clear();
         menu();
         ui_state = ST_SEL_PARAMS;

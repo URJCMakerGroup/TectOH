@@ -105,9 +105,15 @@ short pos_x_eeprom;
 // short are 16bits
 // Speed of the Sandbox in mm/h, from 1 to 100, making it short, to have negative
 // to make some operations
-short vel_mmh = 1;   // Speed of the Sandbox in mm/h, from 1 to 100
-short pos_x_ini = 0;  // Initial position of the gantry for the experiment
-short pos_x_end = 0;  // Final position of the gantry for the experiment
+short vel_mmh = MAX_VEL;  // Speed of the Sandbox in mm/h, from 1 to 100
+short abs_dest = -1;  // absolute position of the destination, from x0 in mm
+short rel_dist = 0;  // relative position of the destination, from initial position
+bool  rel_dist_neg = 0;  // sign of rel_dist: 0: positive, 1: negative
+// relative position of the destination, from actual position, it is update when
+// actual position changes
+short rel_dest_updated = 0;
+
+short abs_init = -1;  // absolute initial position, if -1 is unknown
 
 byte usteps_cnt = 0;    // Number of usteps 0 to 15
 volatile unsigned long tot_halfstep_cnt = 0;  // Number of half steps, from pos  0
@@ -130,26 +136,36 @@ float array_t_half_step[] = {0,529411.76,264705.88,176470.59,132352.94,105882.35
 //  - seldigit_st: indicates which digit is being changed
 
 #define   ST_INI        0   // initial state, welcome
-#define   ST_SEL_PARAMS 1   // Selecting the parameters
-#define   ST_SEL_DIGIT  2   // Selecting which digit to change
-#define   ST_SEL_VALUE  3   // Setting the digit value
-#define   ST_RUN        4   // Running the experiment
+#define   ST_SEL_TASK   1   // Task selection: GO HOME - Move
+#define   ST_SEL_PARAMS 2   // Selecting the parameters: speed, distance
+#define   ST_SEL_DIGIT  3   // Setting the digit
+#define   ST_SEL_VALUE  4   // Setting the digit value
+#define   ST_CONFIRM    5   // Confirming to start
+#define   ST_HOME       6   // Homing
+#define   ST_RUN        7   // Running the experiment
 
 byte ui_state = ST_INI; 
 
-// indicates what parameter are we changing, moving on rows
-#define   SELPARAM_X0    0   // changing the initial position
-#define   SELPARAM_XF    1   // changing the final position
-#define   SELPARAM_VEL   2   // changing the experiment velocity
-#define   SELPARAM_START 3   // start the experiment
+#define   TASK_HOME     0   // Task Go Home
+#define   TASK_MOVE_REL 1   // Task Movement relative
 
-byte selparam_st = SELPARAM_X0;
+byte task_st = TASK_HOME;
+//
+
+// indicates what parameter are we changing, moving on rows
+#define   SELPARAM_VEL    0   // changing the experiment velocity
+#define   SELPARAM_DIST   1   // Distance to move, + or - mm from actual pos
+#define   SELPARAM_GO     2   // start the experiment
+#define   SELPARAM_BACK   3   // Go to previous menu
+
+byte selparam_st = SELPARAM_VEL;
                
 // the column indicates the digit we are changing
 #define   SELDIG_PARAM   0    // go back to parameter select
-#define   SELDIG_100s    1    // changing the hundreds
-#define   SELDIG_TENS    2    // changing the tens
-#define   SELDIG_UNITS   3    // changing the units
+#define   SELDIG_SIGN    1    // changing the sign
+#define   SELDIG_100s    2    // changing the hundreds
+#define   SELDIG_TENS    3    // changing the tens
+#define   SELDIG_UNITS   4    // changing the units
 
 byte seldigit_st = SELDIG_PARAM; //default state, no change
 
@@ -175,10 +191,10 @@ bool rot_enc_left   = false;  // if LCD rotary encoder turned counter cw <-
 #define HOL_FUL_BOX  4
 #define FUL_HOL_BOX  5
 #define FUL_FUL_BOX  6
+#define BACK_ARROW   7
 
 //#define HOL_BOX      4
 //#define FUL_BOX      5
-//#define BACK_ARROW   3
 
 byte hol_diam[8] = // 0: hollow diamond
 {
@@ -310,14 +326,14 @@ void setup() {
   lcd.createChar(HOL_DIAM, hol_diam); // 0: hollow diamond
   lcd.createChar(FUL_DIAM, ful_diam); // 1: full diamond
   lcd.createChar(MICRO,    micro);    // 2: micro symbol
-  //lcd.createChar(BACK_ARROW, back_arrow); // 3: back arrow (return)
-  //lcd.createChar(HOL_BOX   , hol_box);  // 4: hollow box
-  //lcd.createChar(FUL_BOX   , ful_box);  // 5: full box
+  //lcd.createChar(HOL_BOX   , hol_box);  //  : hollow box
+  //lcd.createChar(FUL_BOX   , ful_box);  //  : full box
   lcd.createChar(HOL_HOL_BOX, hol_hol_box); // 3: hollow + hollow box
   lcd.createChar(HOL_FUL_BOX, hol_ful_box); // 4: hollow + full box
 
   lcd.createChar(FUL_HOL_BOX, ful_hol_box); // 5: full + hollow box
   lcd.createChar(FUL_FUL_BOX, ful_ful_box); // 6: full + full box
+  lcd.createChar(BACK_ARROW, back_arrow);   // 7: back arrow (return)
  
   digitalWrite(X_ENABLE_PIN , LOW);  // Stepper motor enable. Active-low
 
@@ -328,6 +344,19 @@ void setup() {
   Timer3.initialize(1000000);             // A million microseconds to count seconds
   Timer3.attachInterrupt(SecondsCounter); // Second counter
   
+}
+
+// -- sign_neg
+//  if >= 0 ->  1
+//  if <0   -> -1
+
+short sign_neg (int num)
+{
+  if (num >= 0) {
+    return 1;
+  } else {
+    return -1;
+  }
 }
 
 // ------ next ui state
@@ -362,22 +391,30 @@ byte nxt_ui_state(byte ui_state_arg, bool right, bool left)
 // selparam_st_arg
 // right, left (indicates if the nob is turned right or left
 
-byte nxt_param(byte selparam_st_arg, bool right, bool left)
+byte nxt_param (byte selparam_st_arg, bool right, bool left, byte task_st_arg)
 {
+  byte selparam_st_res = selparam_st_arg;
+
   if (right == true) {
-    if (selparam_st_arg == SELPARAM_START) {
-      selparam_st_arg = SELPARAM_X0;
+    if (selparam_st_res == SELPARAM_BACK) {
+      selparam_st_res = SELPARAM_VEL;
     } else {
-      selparam_st_arg = selparam_st_arg + 1;
+      selparam_st_res = selparam_st_res + 1;
+      if (task_st_arg == TASK_HOME && selparam_st_res == SELPARAM_DIST) {
+        selparam_st_res = selparam_st_res + 1; // no SELPARAM_DIST when homing
+      }
     }
   } else if (left == true) {
-    if (selparam_st_arg == SELPARAM_X0) { 
-      selparam_st_arg = SELPARAM_START;
-    } else {
-      selparam_st_arg = selparam_st_arg - 1;
+    if (selparam_st_res == SELPARAM_VEL) { 
+      selparam_st_res = SELPARAM_BACK;
+    } else { 
+      selparam_st_res = selparam_st_res - 1;
+      if (task_st_arg == TASK_HOME && selparam_st_res == SELPARAM_DIST) {
+        selparam_st_res = selparam_st_res - 1; // no SELPARAM_DIST when homing
+      }
     }
   }
-  return selparam_st_arg;
+  return selparam_st_res;
 }
 
 // ------ next digit
@@ -387,22 +424,30 @@ byte nxt_param(byte selparam_st_arg, bool right, bool left)
 // seldigit_st_arg
 // right, left (indicates if the nob is turned right or left
 
-byte nxt_digit(byte seldigit_st_arg, bool right, bool left)
+byte nxt_digit(byte seldigit_st_arg, bool right, bool left, byte selparam_st_arg)
 {
+  byte seldigit_st_res = seldigit_st_arg;
+
   if (right == true) {
-    if (seldigit_st_arg == SELDIG_UNITS) {
-      seldigit_st_arg = SELDIG_PARAM;
+    if (seldigit_st_res == SELDIG_UNITS) {
+      seldigit_st_res = SELDIG_PARAM;
     } else {
-      seldigit_st_arg = seldigit_st_arg + 1;
+      seldigit_st_res = seldigit_st_res + 1;
+      if (seldigit_st_res == SELDIG_SIGN && selparam_st_arg == SELPARAM_VEL) {
+        seldigit_st_res = seldigit_st_res + 1; // velocity has no sign
+      }
     }
   } else if (left == true) {
-    if (seldigit_st_arg == SELDIG_PARAM) { 
-      seldigit_st_arg = SELDIG_UNITS;
+    if (seldigit_st_res == SELDIG_PARAM) { 
+      seldigit_st_res = SELDIG_UNITS;
     } else {
-      seldigit_st_arg = seldigit_st_arg - 1;
+      seldigit_st_res = seldigit_st_res - 1;
+      if (seldigit_st_res == SELDIG_SIGN && selparam_st_arg == SELPARAM_VEL) {
+        seldigit_st_res = seldigit_st_res - 1; // velocity has no sign
+      }
     }
   }
-  return seldigit_st_arg;
+  return seldigit_st_res;
 }
 
 // calculates the increment, depending on the knob rotation, and the digit
@@ -569,45 +614,6 @@ void init_screen()
   lcd.setCursor(19, 3);
   lcdprint_endstops();
   
-}
-
-
-//  Print menu on screen
-
-void menu()
-{
-  pos_x_ini = 0;
-  pos_x_end = 0;
-  vel_mmh = 1;
-
-  lcd.setCursor(1, 0);
-  lcd.print("Init posX");
-  lcd.setCursor(12, 0);
-  lcdprint_rght(pos_x_ini,3);
-  lcd.setCursor(18, 0);
-  lcd.print("mm");
-  lcd.setCursor(1, 1);
-  lcd.print("End posX");
-  lcd.setCursor(12, 1);
-  lcdprint_rght(pos_x_end,3);
-  lcd.setCursor(18, 1);
-  lcd.print("mm");
-  lcd.setCursor(1, 2);
-  lcd.print("velocity");
-  lcd.setCursor(12, 2);
-  lcdprint_rght(vel_mmh,3);
-  lcd.setCursor(16, 2);
-  lcd.print("mm/h");
-  lcd.setCursor(1, 3);
-  lcd.print("Start Experimet");
-  lcd.setCursor(0, 0);
-  lcd.write(byte(FUL_DIAM));
-  lcd.setCursor(0, 1);
-  lcd.write(byte(HOL_DIAM));
-  lcd.setCursor(0, 2);
-  lcd.write(byte(HOL_DIAM));
-  lcd.setCursor(0, 3);
-  lcd.write(byte(HOL_DIAM));
 }
 
 
@@ -799,97 +805,6 @@ void lin_encoder() {
     }
 }
 
-void update_menu() {
-
-  byte col, row;
-  static byte ui_state_prev = ST_SEL_PARAMS;
-  static byte selparam_st_prev = SELPARAM_X0;
-  static byte seldigit_st_prev = SELDIG_PARAM;
-  static short pos_x_ini_prev = 0;
-  static short pos_x_end_prev = 0;
-  static short vel_mmh_prev   = 1;  
-
-  if (ui_state >= ST_SEL_PARAMS && ui_state <= ST_SEL_VALUE) {
-    if (selparam_st != selparam_st_prev ) {
-      // draw all the hollow diamonds
-      lcd.setCursor(0, 0);
-      lcd.write(byte(HOL_DIAM));
-      lcd.setCursor(0, 1);
-      lcd.write(byte(HOL_DIAM));
-      lcd.setCursor(0, 2);
-      lcd.write(byte(HOL_DIAM));
-      lcd.setCursor(0, 3);
-      lcd.write(byte(HOL_DIAM));
-      lcd.setCursor(0, selparam_st); // the full diamond
-      lcd.write(byte(FUL_DIAM));
-    }  
-    if (ui_state != ui_state_prev ) {
-      switch (ui_state) {
-        case ST_SEL_PARAMS:
-          lcd.noCursor(); // no cursor when setting params
-          lcd.noBlink();  // no blink when setting params
-          break;
-        case ST_SEL_DIGIT:
-          lcd.cursor();  // cursor when selecting digits
-          lcd.noBlink(); // no blink when selecting digits
-          break;
-        case ST_SEL_VALUE:
-          lcd.cursor();  // cursor when selecting digits
-          lcd.blink();   // blink when selecting digits
-          break;
-        default:
-          lcd.noCursor(); // no cursor
-          lcd.noBlink();  // no blink
-          break;
-      }
-    }
-
-    switch (seldigit_st) {
-      case SELDIG_PARAM:
-        col = 0; // selection at first col (diamonds)
-        break;
-      case SELDIG_100s:
-        col = LCD_PARAMS_COL;
-        break;
-      case SELDIG_TENS:
-        col = LCD_PARAMS_COL+1;
-        break;
-      case SELDIG_UNITS:
-        col = LCD_PARAMS_COL+2;
-        break;
-    }
-    // draw the parameters if changed
-    if (pos_x_ini != pos_x_ini_prev) {
-      lcd.setCursor(LCD_PARAMS_COL, SELPARAM_X0);
-      lcdprint_rght(pos_x_ini,3); //3 is the number of digits
-    }
-    if (pos_x_end != pos_x_end_prev) {
-      lcd.setCursor(LCD_PARAMS_COL, SELPARAM_XF);
-      lcdprint_rght(pos_x_end,3); //3 is the number of digits
-    }
-    if (vel_mmh != vel_mmh_prev) {
-      lcd.setCursor(LCD_PARAMS_COL, SELPARAM_VEL);
-      lcdprint_rght(vel_mmh,3); //3 is the number of digits
-    }
-
-    if  ((ui_state_prev    != ui_state    ) ||
-         (selparam_st_prev != selparam_st ) ||
-         (seldigit_st_prev != seldigit_st ) ||
-         (pos_x_ini_prev   != pos_x_ini   ) ||
-         (pos_x_end_prev   != pos_x_end   ) ||
-         (vel_mmh_prev     != vel_mmh     )) {  
-      lcd.setCursor(col, selparam_st); //row is directly defined by selparam_st
-    }
-  }
-
-  // uptade previous values
-  ui_state_prev    = ui_state;
-  selparam_st_prev = selparam_st;
-  seldigit_st_prev = seldigit_st;
-  pos_x_ini_prev    = pos_x_ini;
-  pos_x_end_prev    = pos_x_end;
-  vel_mmh_prev      = vel_mmh;  
-}
 
 
 // ------------------------ check_pos_x_eeprom
@@ -917,6 +832,265 @@ void check_pos_x_eeprom()
   }
 }
 
+
+
+//  ----- Print task menu on screen
+//  select GO HOME o move x mm
+
+void task_menu()
+{
+
+  lcd.clear();
+  lcd.setCursor(1, 0);
+  lcd.print("Go Home");
+
+  lcd.setCursor(1, 1);
+  lcd.print("Relative move");
+
+  lcd.setCursor(10, 3);
+  lcd.print("| x: ");
+  if (pos_x_eeprom == -1) {
+    lcd.print("  ?");
+  } else {
+    lcdprint_rght(pos_x_eeprom,3);
+  }
+
+  lcd.setCursor(0, 0);
+  if (task_st == TASK_HOME) {
+    lcd.write(byte(FUL_DIAM));
+    lcd.setCursor(0, 1);
+    lcd.write(byte(HOL_DIAM));
+  } else {
+    lcd.write(byte(HOL_DIAM));
+    lcd.setCursor(0, 1);
+    lcd.write(byte(FUL_DIAM));
+  }
+
+  // endstop print
+  lcd.setCursor(19, 3);
+  lcdprint_endstops();
+
+}
+
+// ------------------- update_task_menu
+
+void update_task_menu()
+{
+
+  static byte task_st_prev = TASK_HOME;
+
+  if (task_st_prev != task_st) {
+    // draw the diamonds
+    lcd.setCursor(0, 0);
+    if (task_st == TASK_HOME) {
+      lcd.write(byte(FUL_DIAM));
+      lcd.setCursor(0, 1);
+      lcd.write(byte(HOL_DIAM));
+    } else {
+      lcd.write(byte(HOL_DIAM));
+      lcd.setCursor(0, 1);
+      lcd.write(byte(FUL_DIAM));
+    }
+    // endstop print (just in case)
+    lcd.setCursor(19, 3);
+    lcdprint_endstops();
+  }
+}
+
+
+
+
+
+void param_menu ()
+{
+
+  lcd.clear();
+  // -- row 0
+  lcd.setCursor(0, 0);
+  if (selparam_st == SELPARAM_VEL) {
+    lcd.write(byte(FUL_DIAM));
+  } else {
+    lcd.write(byte(HOL_DIAM));
+  }
+
+  lcd.setCursor(1, 0);
+  lcd.print("Speed");
+  lcd.setCursor(12, 0);
+  lcdprint_rght(vel_mmh,3);
+  lcd.setCursor(18, 0);
+  lcd.print("mm/h");
+
+  // -- row 1 
+  lcd.setCursor(1, 1);
+  if (task_st == TASK_HOME) {
+    lcd.print("Go Home:  x = 0 mm (absolute)");
+  } else {
+    lcd.setCursor(0, 1);
+    if (selparam_st == SELPARAM_DIST) {
+      lcd.write(byte(FUL_DIAM));
+    } else {
+      lcd.write(byte(HOL_DIAM));
+    }
+    lcd.print("Travel dist.");
+    lcd.setCursor(11, 1);
+    if (rel_dist_neg == true) {
+      lcd.print("-");
+    } else {
+      lcd.print("+");
+    }
+    lcd.setCursor(12, 1);
+    lcdprint_rght(rel_dist,3);
+    lcd.setCursor(16, 1);
+    lcd.print("mm");
+  }
+
+  // -- row 2 GO
+  lcd.setCursor(0, 2);
+  if (selparam_st == SELPARAM_GO) {
+    lcd.write(byte(FUL_DIAM));
+  } else {
+    lcd.write(byte(HOL_DIAM));
+  }
+  lcd.setCursor(1, 2);
+  lcd.print("Go!");
+
+
+  // -- row 3, go back
+  lcd.setCursor(0, 3);
+  if (selparam_st == SELPARAM_BACK) {
+    lcd.write(byte(FUL_DIAM));
+  } else {
+    lcd.write(byte(HOL_DIAM));
+  }
+  lcd.setCursor(1, 3);
+  lcd.print("Back");
+  lcd.write(byte(BACK_ARROW))
+
+  // aditional info:
+  lcd.setCursor(10, 3);
+  lcd.print("| x: ");
+  if (pos_x_eeprom == -1) {
+    lcd.print("  ?");
+  } else {
+    lcdprint_rght(pos_x_eeprom,3);
+  }
+  lcd.print(" mm");
+
+  // endstop print
+  lcd.setCursor(19, 3);
+  lcdprint_endstops();
+}
+
+void update_param_menu() {
+
+  byte col, row;
+  static byte ui_state_prev = ST_SEL_PARAMS;
+  static byte selparam_st_prev = SELPARAM_VEL;
+  static byte seldigit_st_prev = SELDIG_PARAM;
+  static short rel_dist_prev = 0; // relative destination
+  static short vel_mmh_prev  = MAX_VEL;  
+
+  if (ui_state >= ST_SEL_PARAMS && ui_state <= ST_SEL_VALUE) {
+    if (selparam_st != selparam_st_prev ) {
+
+      lcd.setCursor(0, 0);
+      if (selparam_st == SELPARAM_VEL) {
+        lcd.write(byte(FUL_DIAM));
+      } else {
+        lcd.write(byte(HOL_DIAM));
+      }
+      
+      if (task_st != TASK_HOME) {
+        lcd.setCursor(0, 1);
+        if (selparam_st == SELPARAM_DIST) {
+          lcd.write(byte(FUL_DIAM));
+        } else {
+          lcd.write(byte(HOL_DIAM));
+        }
+      }
+
+      lcd.setCursor(0, 2);
+      if (selparam_st == SELPARAM_GO) {
+        lcd.write(byte(FUL_DIAM));
+      } else {
+        lcd.write(byte(HOL_DIAM));
+      }
+
+      lcd.setCursor(0, 3);
+      if (selparam_st == SELPARAM_BACK) {
+        lcd.write(byte(FUL_DIAM));
+      } else {
+        lcd.write(byte(HOL_DIAM));
+      }
+    }  
+    if (ui_state != ui_state_prev ) {
+      switch (ui_state) {
+        case ST_SEL_PARAMS:
+          lcd.noCursor(); // no cursor when setting params
+          lcd.noBlink();  // no blink when setting params
+          break;
+        case ST_SEL_DIGIT:
+          lcd.cursor();  // cursor when selecting digits
+          lcd.noBlink(); // no blink when selecting digits
+          break;
+        case ST_SEL_VALUE:
+          lcd.cursor();  // cursor when selecting digits
+          lcd.blink();   // blink when selecting digits
+          break;
+        default:
+          lcd.noCursor(); // no cursor
+          lcd.noBlink();  // no blink
+          break;
+      }
+    }
+
+    switch (seldigit_st) {
+      case SELDIG_PARAM:
+        col = 0; // selection at first col (diamonds)
+        break;
+      case SELDIG_SIGN:
+        col = LCD_PARAMS_COL-1;
+        break;
+      case SELDIG_100s:
+        col = LCD_PARAMS_COL;
+        break;
+      case SELDIG_TENS:
+        col = LCD_PARAMS_COL+1;
+        break;
+      case SELDIG_UNITS:
+        col = LCD_PARAMS_COL+2;
+        break;
+    }
+    // draw the parameters if changed
+    if (vel_mmh != vel_mmh_prev) {
+      lcd.setCursor(LCD_PARAMS_COL, SELPARAM_VEL); // row 0
+      lcdprint_rght(vel_mmh,3); //3 is the number of digits
+    }
+    if (task_st != TASK_HOME) {
+      if (rel_dist != rel_dist_prev) {
+        lcd.setCursor(LCD_PARAMS_COL, SELPARAM_DIST);
+        lcdprint_rght(rel_dist,3); //3 is the number of digits
+      }
+    }
+
+    if  ((ui_state_prev    != ui_state    ) ||
+         (selparam_st_prev != selparam_st ) ||
+         (seldigit_st_prev != seldigit_st ) ||
+         (rel_dist_prev    != rel_dist    ) ||
+         (vel_mmh_prev     != vel_mmh     )) {  
+      lcd.setCursor(col, selparam_st); //row is directly defined by selparam_st
+    }
+  }
+
+  // uptade previous values
+  ui_state_prev    = ui_state;
+  selparam_st_prev = selparam_st;
+  seldigit_st_prev = seldigit_st;
+  rel_dist_prev    = rel_dist;
+  vel_mmh_prev      = vel_mmh;  
+}
+
+
 void loop() {
 
   short val_incr;
@@ -929,36 +1103,59 @@ void loop() {
     case ST_INI:
       init_screen();
       rot_enc_pushed = rot_encoder_pushed();
-      if (rot_enc_pushed == HIGH) { 
+      if (rot_enc_pushed == true) { 
         // get the EEPROM value (only once)
         check_pos_x_eeprom();
-        lcd.clear();
-        menu();
-        ui_state = ST_SEL_PARAMS;
+        task_menu();
+        ui_state = ST_SEL_TASK
       }
       break;
-    case ST_SEL_PARAMS: // Choosing between setting x0, xfin, vel, or start
-      update_menu();
+    case ST_SEL_TASK: // Choosing between going home or moving distance
       rot_enc_pushed = rot_encoder_pushed();
-      if (rot_enc_pushed == HIGH) {
-        // we go to select the digit, unless the parameter selected is to start
-        if (selparam_st == SELPARAM_START) {
-          ui_state = ST_RUN;
-          lcd.clear();
-        } else {
-          // when comming from ST_SEL_PARAMS, we start with the units
-          ui_state    = ST_SEL_DIGIT;
-          seldigit_st = SELDIG_UNITS; // start with units
+      if (rot_enc_pushed == true) { // select parameters
+        param_menu();
+        ui_state = ST_SEL_PARAMS;
+      } else {
+        read_rot_encoder_dir();
+        if (rot_enc_rght == true || rot_enc_left == true) {
+          // only 2, so the other
+          if (task_st == TASK_HOME) {
+            task_st = TASK_MOVE_REL;
+          } else {
+            task_st = TASK_HOME;
+          }
+          update_task_menu();
+        }
+      }
+      break;
+    case ST_SEL_PARAMS: // Selecting speed, distance (if not homing) & go back
+      rot_enc_pushed = rot_encoder_pushed();
+      if (rot_enc_pushed == true) { 
+        switch (selparam_st) {
+          case SELPARAM_VEL:
+          case SELPARAM_DIST:
+            ui_state = ST_SEL_DIGIT;
+            update_param_menu();
+            break;
+          case SELPARAM_GO:
+            ui_state = ST_CONFIRM;
+            break;
+          case SELPARAM_BACK:
+            ui_state = ST_SEL_TASK;
+            task_menu();
+            break;
+          default:
+            break;
         }
       } else {
         read_rot_encoder_dir();
-        selparam_st = nxt_param(selparam_st, rot_enc_rght, rot_enc_left);
+        selparam_st = nxt_param(selparam_st, rot_enc_rght, rot_enc_left, task_st);
+        update_param_menu();
       }
       break;
-    case ST_SEL_DIGIT: // Choosing between the digit
-      update_menu();
+    case ST_SEL_DIGIT: // Selecting digit to change
       rot_enc_pushed = rot_encoder_pushed();
-      if (rot_enc_pushed == HIGH) { // digit selected -> select value
+      if (rot_enc_pushed == true) { // digit selected -> select value
         if (seldigit_st == SELDIG_PARAM) { // go back to ST_SEL_PARAMS
           ui_state = ST_SEL_PARAMS;
         } else {
@@ -966,37 +1163,21 @@ void loop() {
         }
       } else { // knob not pushed
         read_rot_encoder_dir();
-        seldigit_st = nxt_digit(seldigit_st, rot_enc_rght, rot_enc_left);
-      }
+        seldigit_st = nxt_digit(seldigit_st, rot_enc_rght, rot_enc_left, selparam_st);
+      } 
+      update_param_menu();
       break;
     case ST_SEL_VALUE: // Setting/selecting the digit value
-      update_menu();
       rot_enc_pushed = rot_encoder_pushed();
-      if (rot_enc_pushed == HIGH) { // value selected, go back
-        // we can only be here if we are changing values (units, 10s, 100s)
-        // of X0, XF, VEL
+      if (rot_enc_pushed == true) { // value selected, go back
+        // we can only be here if we are changing values (units, 10s, 100s, sign)
+        // of vel and dist
         ui_state = ST_SEL_DIGIT;
       } else {
         read_rot_encoder_dir();
         val_incr = calc_incr(seldigit_st, rot_enc_rght, rot_enc_left);
         if (rot_enc_rght == true) { // adding
           switch (selparam_st) {
-            case SELPARAM_X0: // changing the initial position
-              aux_val = pos_x_ini + val_incr;
-              if (aux_val > TOT_LEN) {
-                pos_x_ini = TOT_LEN;
-              } else {
-                pos_x_ini = aux_val;
-              }
-              break;
-            case SELPARAM_XF: // changing the final position
-              aux_val = pos_x_end + val_incr;
-              if (aux_val > TOT_LEN) {
-                pos_x_end = TOT_LEN;
-              } else {
-                pos_x_end = aux_val;
-              }
-              break;
             case SELPARAM_VEL: // changing the velocity
               aux_val = vel_mmh + val_incr;
               if (aux_val > MAX_VEL) {
@@ -1005,33 +1186,41 @@ void loop() {
                 vel_mmh = aux_val;
               }
               break;
+            case SELPARAM_DIST: // changing the destination
+              if (seldigit_st == SELDIG_SIGN) {
+                rel_dist_sign = ! rel_dist_sign;
+              } else {
+                aux_val = rel_dist + val_incr;
+                if (aux_val > TOT_LEN) {
+                  rel_dist = TOT_LEN;
+                } else {
+                  rel_dist = aux_val;
+                }
+              }
+              break;
             default: // would be an error to be here
               break;
           }
         } else if (rot_enc_left == true) { // substracting
            switch (selparam_st) {
-            case SELPARAM_X0: // changing the initial position
-              aux_val = pos_x_ini + val_incr; // val_incr is negative
-              if (aux_val < 0) {
-                pos_x_ini = 0;
-              } else {
-                pos_x_ini = aux_val;
-              }
-              break;
-            case SELPARAM_XF: // changing the final position
-              aux_val = pos_x_end + val_incr;
-              if (aux_val < 0) {
-                pos_x_end = 0;
-              } else {
-                pos_x_end = aux_val;
-              }
-              break;
-            case SELPARAM_VEL: // changing the velocity
-              aux_val = vel_mmh + val_incr;
+            case SELPARAM_VEL: // velocity
+              aux_val = vel_mmh + val_incr; // val_incr is negative
               if (aux_val < 1) {
                 vel_mmh = 1;
               } else {
                 vel_mmh = aux_val;
+              }
+              break;
+            case SELPARAM_DIST: // changing the destination
+              if (seldigit_st == SELDIG_SIGN) {
+                rel_dist_sign = ! rel_dist_sign;
+              } else {
+                aux_val = rel_dist + val_incr;
+                if (aux_val < 0) {
+                  rel_dist = 0;
+                } else {
+                  rel_dist = aux_val;
+                }
               }
               break;
             default: // would be an error to be here
@@ -1039,7 +1228,13 @@ void loop() {
           }
         }
       }
+      update_param_menu();
       break;
+    case ST_CONFIRM: 
+      t_half_ustep = ((unsigned long)array_t_half_ustep[vel_mmh]);     
+
+
+
     case ST_RUN: 
       lcd.clear();
       t_half_ustep = ((unsigned long)array_t_half_ustep[vel_mmh]);     

@@ -38,7 +38,10 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 #define ROT_ENCPB_PIN 35   // Rotary encoder push button
 
 // Beeper
-// #define BEEPER_PIN 33
+//#define LCD_BEEPER_PIN 33
+
+// LCD stop / kill button
+#define LCD_STOP_PIN 41
 
 // ----------- Endstops 
 #define X_MIN_PIN 3         // INIT endstop x=0 (True when pressed)
@@ -55,25 +58,20 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 #define LPS_ENC1_PIN  20  // Linear position encoder 1 pin
 #define LPS_ENC2_PIN  21  // PIN del canal B del encoder
 
-// not used, just in the interrupt
-//int lps_enc1;          // Value of linear encoder channel 1
-int lps_enc2;          // Value of linear position sensor (lps) encoder channel 2
 
 volatile int lps_line_cnt = 0;    // number of counted lines of the linear position sensor
 const float mm_per_lps_line = 0.160; // milimiters per line from linear pos sensor
 float lps_mm = 0;    // milimeters count by the linear position sensor (lps)
 
-bool endstop_x_ini;    // endstop value at x=0
-bool endstop_x_end;    // endstop value at the end
 
 const int TOT_LEN = 400;    // leadscrew length in mm, maximum distance
 const int MAX_VEL = 100;    // maximum velocity in mm/h
 
-// VARIABLES MEDIDA TIEMPO 
+// ---- variables for keeping track the experiment timing
 
-int horas = 0;              // Variable que cuenta las horas del experimento
-int minutos = 0;            // Variable que cuenta los minutos del experimento
-volatile int segundos = 0;  // Variable que cuenta los segundos del experimento
+short num_hours = 0;        // Keep track of the number of hours of the experiment
+byte num_minutes = 0;       // Keep track of the number of minutes of the experiment
+volatile byte num_secs = 0; // Keep track of the number of seconds of the experiment
 
 // Sandbox parameters
 
@@ -144,7 +142,6 @@ bool rot_enc1, rot_enc2;
 
 bool rot_enc_rght   = false;  // if LCD rotary encoder turned clocwise ->
 bool rot_enc_left   = false;  // if LCD rotary encoder turned counter cw <-
-bool rot_enc_pushed = false;  // if LCD rotary encoder pushed
 
 // New symbols
 
@@ -221,10 +218,12 @@ void setup() {
  
   digitalWrite(X_ENABLE_PIN , LOW);  // Stepper motor enable. Active-low
 
-  attachInterrupt(digitalPinToInterrupt(LPS_ENC1_PIN), encoder, RISING);     // Función de la interrupcion del encoder
+  // interrupt for the linear position sensor
+  attachInterrupt(digitalPinToInterrupt(LPS_ENC1_PIN), encoder, RISING);
 
-  Timer3.initialize(1000000);              // Inicialización de la interrupcion del contador de segundos
-  Timer3.attachInterrupt(Temporizador);    // Función de la interrupcion del contador de segundos
+  // interrupt for the counter of seconds, to keep track of the time 
+  Timer3.initialize(1000000);             // A million microseconds to count seconds
+  Timer3.attachInterrupt(SecondsCounter); // Second counter
   
 }
 
@@ -396,23 +395,26 @@ void read_rot_encoder_dir()
   rot_enc2_prev = rot_enc2;
 }
 
+// -------------------- rot_encoder_pushed ---------------
+// reads the value of the rotary encoder, true if pushed
+// compares with the last time it has been read
 
-bool read_rot_encoder_pb()
+bool rot_encoder_pushed()
 {
   // only read in the menu user interface, not during the experiment
 
   // static variables are only initilized the first time and keep their value
   // first time to true because it seems that initially is HIGH, maybe due
   // to de pull-up input
-  static bool rot_enc_pb_prev = true;
+  static byte rot_enc_pb_prev = HIGH;
 
 
-  bool   rot_enc_pb;  // push button of the rotary encoder
+  byte   rot_enc_pb;  // push button of the rotary encoder
   bool   pushed = false;
 
   rot_enc_pb = digitalRead(ROT_ENCPB_PIN);
 
-  if (rot_enc_pb == true && rot_enc_pb_prev == false) {
+  if (rot_enc_pb == HIGH && rot_enc_pb_prev == LOW) {
     pushed = true;
     delay(300);
   }
@@ -488,16 +490,17 @@ void menu()
 
 void experimento() {
 
+  byte endstop_x_ini;    // endstop value at x=0
+  byte endstop_x_end;    // endstop value at the end
+
   endstop_x_ini = digitalRead(X_MIN_PIN);
   endstop_x_end = digitalRead(X_MAX_PIN);
   
-  if (endstop_x_ini == true )
-  {
+  if (endstop_x_ini == HIGH ) {
     inicio = 1;
   }
 
-  if (endstop_x_end == true )
-  {
+  if (endstop_x_end == HIGH ) {
     fin = 1;
   }
 
@@ -584,33 +587,36 @@ void experimento() {
     lcd.print("A CERO");
     }
   else if (inicio_experimento == 1 && fin ==0 && (avance_mediospasos < pos_x_end)){  
-      if (segundos == 60)    {
-      segundos = 0;
-      minutos++;           }
-      if (minutos == 60)     {
-      minutos = 0;
-      horas++;             }
+      if (num_secs == 60)    {
+      num_secs = 0;
+      num_minutes++;           }
+      if (num_minutes == 60)     {
+      num_minutes = 0;
+      num_hours++;             }
       lcd.setCursor(0, 1);
-      if (horas < 10)        {
+      if (num_hours < 10)        {
       lcd.print("0");      }
-      lcd.print(horas);
+      lcd.print(num_hours);
       lcd.print(":");
       lcd.setCursor(3, 1);
-      if (minutos < 10)      {
+      if (num_minutes < 10)      {
       lcd.print("0");      }
-      lcd.print(minutos);
+      lcd.print(num_minutes);
       lcd.print(":");
       lcd.setCursor(6, 1);
-      if (segundos < 10)     {
+      if (num_secs < 10)     {
       lcd.print("0");        }
-      lcd.print(segundos);
+      lcd.print(num_secs);
     }
 }
 
-void Temporizador() {
+
+// -------------- Interrupt function to count seconds
+
+void SecondsCounter() {
   
-  if (inicio_experimento == 1 && fin ==0) {//                             <- INTERRUPCION CRONOMETRO
-    segundos++;
+  if (inicio_experimento == 1 && fin ==0) {
+    num_secs++;
   }
   
 }
@@ -644,6 +650,9 @@ void MedioPaso() {
 
 // linear encoder interrupt to read lines
 void encoder() {
+    // not used, just in the interrupt
+    //int lps_enc1;          // Value of linear encoder channel 1
+    byte lps_enc2;          // Value of linear position sensor (lps) encoder channel 2
 
     if (inicio_experimento == 1 && fin == 0) {
       // linear position sensor encoder channel 2
@@ -754,12 +763,13 @@ void loop() {
 
   short val_incr;
   short aux_val;
+  bool rot_enc_pushed;  // if LCD rotary encoder pushed
   
   switch (ui_state){
     case ST_INI:
       init_screen();
-      rot_enc_pushed = read_rot_encoder_pb();
-      if (rot_enc_pushed == true) { 
+      rot_enc_pushed = rot_encoder_pushed();
+      if (rot_enc_pushed == HIGH) { 
         lcd.clear();
         menu();
         ui_state = ST_SEL_PARAMS;
@@ -767,8 +777,8 @@ void loop() {
       break;
     case ST_SEL_PARAMS: // Choosing between setting x0, xfin, vel, or start
       update_menu();
-      rot_enc_pushed = read_rot_encoder_pb();
-      if (rot_enc_pushed == true) {
+      rot_enc_pushed = rot_encoder_pushed();
+      if (rot_enc_pushed == HIGH) {
         // we go to select the digit, unless the parameter selected is to start
         if (selparam_st == SELPARAM_START) {
           ui_state = ST_RUN;
@@ -785,8 +795,8 @@ void loop() {
       break;
     case ST_SEL_DIGIT: // Choosing between the digit
       update_menu();
-      rot_enc_pushed = read_rot_encoder_pb();
-      if (rot_enc_pushed == true) { // digit selected -> select value
+      rot_enc_pushed = rot_encoder_pushed();
+      if (rot_enc_pushed == HIGH) { // digit selected -> select value
         if (seldigit_st == SELDIG_PARAM) { // go back to ST_SEL_PARAMS
           ui_state = ST_SEL_PARAMS;
         } else {
@@ -799,8 +809,8 @@ void loop() {
       break;
     case ST_SEL_VALUE: // Setting/selecting the digit value
       update_menu();
-      rot_enc_pushed = read_rot_encoder_pb();
-      if (rot_enc_pushed == true) { // value selected, go back
+      rot_enc_pushed = rot_encoder_pushed();
+      if (rot_enc_pushed == HIGH) { // value selected, go back
         // we can only be here if we are changing values (units, 10s, 100s)
         // of X0, XF, VEL
         ui_state = ST_SEL_DIGIT;

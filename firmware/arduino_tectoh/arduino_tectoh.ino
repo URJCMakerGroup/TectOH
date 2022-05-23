@@ -67,6 +67,15 @@ float lps_mm = 0;    // milimeters count by the linear position sensor (lps)
 const int TOT_LEN = 400;    // leadscrew length in mm, maximum distance
 const int MAX_VEL = 100;    // maximum velocity in mm/h
 
+const int LEAD = 3;  // lead screw lead in mm. How many mm advances per revolution
+const int STEP_REV = 200; // how many steps per revolution the motor has
+const int HSTEP_REV = 2 * STEP_REV; // halfsteps per revolution
+
+const float GEAR_R = 51.0; // gear ratio of the motor
+
+//advance in mm per halfstep
+const float ADVAN_HSTEP = float(LEAD) / (HSTEP_REV * GEAR_R);
+
 // ---- variables for keeping track the experiment timing
 
 short hour_cnt = 0;        // Keep track of the number of hours of the experiment
@@ -85,8 +94,8 @@ short pos_x_end = 0;  // Final position of the gantry for the experiment
 byte usteps_cnt = 0;    // Number of usteps 0 to 15
 volatile unsigned long tot_halfstep_cnt = 0;  // Number of half steps, from pos  0
 volatile unsigned long halfstep_cnt = 0;     // Number of half steps, from initial position
-float avance_mediospasos = 0;         // Avance a partir de los medios pasos dados por el motor conocido su avance por cada medio paso cuando el experimento empieza en 0 mm
-float avance_mediospasos2 = 0;        // Avance a partir de los medios pasos dados por el motor conocido su avance por cada medio paso cuando el experimento no empieza en 0 mm
+float absol_pos_mm = 0;     // position from the x=0 in mm, absolute position
+float relat_pos_mm = 0;     // position from the initial position of the experimet, relative
 
 // El siguiente vector muestra los tiempos de cada medio micropaso dependiendo de la velocidad seleccionado. Este vector se encuentra en un .csv en el GitHub del autor del trabajo
 float array_t_half_ustep[] = {0,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,199.33,196.95,194.64,192.37,190.16,188.00,185.89,183.82,181.80,179.83,177.89,176.00,174.15,172.33,170.56,168.82,167.11,165.44};
@@ -127,7 +136,7 @@ byte selparam_st = SELPARAM_X0;
 byte seldigit_st = SELDIG_PARAM; //default state, no change
 
 
-int inicio = 0;             // Variable que inicia el experimento cuando comienza en 0 mm
+bool homed = false;        // if the gantry has gone to the init endstop
 int inicio_experimento = 0; // Variable que inicia el experimento cuando no comienza en 0 mm
 int fin = 0;           // Variable que para el experimento cuando llega al final de carrera 
 
@@ -484,29 +493,29 @@ void experimento() {
   endstop_x_end = digitalRead(X_MAX_PIN);
   
   if (endstop_x_ini == HIGH ) {
-    inicio = 1;
+    homed = 1;
   }
 
   if (endstop_x_end == HIGH ) {
     fin = 1;
   }
 
-  if (inicio == 1) {
+  if (homed == true) {
     if (pos_x_ini == 0) {
       inicio_experimento = 1;
     }
-    else if (pos_x_ini == (0.000147* tot_halfstep_cnt)) {
+    else if (pos_x_ini == (ADVAN_HSTEP * tot_halfstep_cnt)) {
       inicio_experimento = 1;
     }
   }  
 
 // MOVIMIENTO MOTOR
 
-  if (inicio == 1 && fin == 0) {  
-       digitalWrite(X_DIR_PIN , HIGH);
+  if (homed == true && fin == 0) {  
+    digitalWrite(X_DIR_PIN , HIGH);
   }
   else { 
-       digitalWrite(X_DIR_PIN , LOW);
+    digitalWrite(X_DIR_PIN , LOW);
   }   
 
 // POSITION
@@ -547,17 +556,17 @@ void experimento() {
     lcd.setCursor(12, 2);    
     lcd.print(tot_halfstep_cnt);
 
-    avance_mediospasos = (0.000147 * tot_halfstep_cnt);   // Avance de cada medio paso del motor = 0.000147 mm, ya que el eje del motor tiene 3 mm/vuelta y una reduccion de 51
-    avance_mediospasos2 = (0.000147 * halfstep_cnt);
+    absol_pos_mm = (ADVAN_HSTEP * tot_halfstep_cnt);   // each halfstep
+    relat_pos_mm = (ADVAN_HSTEP * halfstep_cnt);
 
     lcd.setCursor(0, 3);
     lcd.print("Avance: ");
     lcd.setCursor(7, 3);
     
     if (pos_x_ini == 0){     
-    lcd.print(avance_mediospasos);}
+    lcd.print(absol_pos_mm);}
     else{
-    lcd.print(avance_mediospasos2);
+    lcd.print(relat_pos_mm);
     }
     
     lcd.setCursor(11, 3);
@@ -567,13 +576,12 @@ void experimento() {
   
 // TIEMPO 
   
-  if (inicio == 0 && fin ==0) {
+  if (homed == false && fin ==0) {
     lcd.setCursor(0, 0);
     lcd.print("MOVIENDO");
     lcd.setCursor(0, 1);
     lcd.print("A CERO");
-    }
-  else if (inicio_experimento == 1 && fin ==0 && (avance_mediospasos < pos_x_end)){  
+  } else if (inicio_experimento == 1 && fin ==0 && (absol_pos_mm < pos_x_end)){  
       if (sec_cnt == 60)    {
       sec_cnt = 0;
       minute_cnt ++;           }
@@ -614,13 +622,13 @@ void SecondsCounter() {
 void gen_usteps() {
   static byte step_value = LOW;     // signal to send to stepper motor pin
 
-  if (ui_state == ST_RUN && (avance_mediospasos < pos_x_end) && fin == 0){
+  if (ui_state == ST_RUN && (absol_pos_mm < pos_x_end) && fin == 0){
     if (usteps_cnt < 16){
       digitalWrite(X_STEP_PIN , step_value);
       if (step_value == LOW){
          step_value = HIGH;
-         usteps_cnt++;}
-      else{
+         usteps_cnt++;
+      } else{
          step_value = LOW;
       }
     }
@@ -632,11 +640,11 @@ void gen_usteps() {
 void MedioPaso() {
   usteps_cnt = 0; // initialize the ustpes
   
-  if (inicio == 1 && fin ==0 && (avance_mediospasos < pos_x_end)){ 
+  if (homed == true && fin ==0 && (absol_pos_mm < pos_x_end)){ 
     tot_halfstep_cnt ++;
   }
     
-  if (0.000147 * tot_halfstep_cnt > pos_x_ini){
+  if (ADVAN_HSTEP * tot_halfstep_cnt > pos_x_ini){
     halfstep_cnt ++;
   }
 }
@@ -743,12 +751,12 @@ void update_menu() {
   }
 
   // uptade previous values
-  ui_state_prev = ui_state;
+  ui_state_prev    = ui_state;
   selparam_st_prev = selparam_st;
   seldigit_st_prev = seldigit_st;
-  pos_x_ini_prev = pos_x_ini;
-  pos_x_end_prev = pos_x_end;
-  vel_mmh_prev   = vel_mmh;  
+  pos_x_ini_prev    = pos_x_ini;
+  pos_x_end_prev    = pos_x_end;
+  vel_mmh_prev      = vel_mmh;  
 }
 
 

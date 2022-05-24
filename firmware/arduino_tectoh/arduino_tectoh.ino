@@ -95,9 +95,11 @@ byte endstop_x_end;    // endstop value at the end
 
 // defined in configuration file: tectoh_config.h
 #if ENDSTOP_ACTIVE_HIGH
-  #define ENDSTOP_ON HIGH
+  #define ENDSTOP_ON  HIGH
+  #define ENDSTOP_OFF LOW
 #else
-  #define ENDSTOP_ON LOW
+  #define ENDSTOP_ON  LOW
+  #define ENDSTOP_OFF HIGH
 #endif
 
 const int TOT_LEN = 400;    // leadscrew length in mm, maximum distance
@@ -116,8 +118,8 @@ const float ADVAN_HSTEP = float(LEAD) / (HSTEP_REV * GEAR_R);
 
 // and experiment could take 400 hours if 400 mm at 1mm/h, it is not likely
 // but just in case, make it short, not byte
-short hour_cnt = 0;        // Keep track of the number of hours of the experiment
-byte minute_cnt = 0;       // Keep track of the number of minutes of the experiment
+volatile short hour_cnt = 0;        // Keep track of the number of hours of the experiment
+volatile byte minute_cnt = 0;       // Keep track of the number of minutes of the experiment
 volatile byte sec_cnt = 0; // Keep track of the number of seconds of the experiment
 
 // ----- Sandbox parameters
@@ -149,9 +151,10 @@ volatile byte h_ustp_cnt = 0;    // Number of half usteps in a halfstep 0 to 31
 //               2,714,666.67 halfsteps (22 bits) So we can count them
 volatile unsigned long hstp_cnt = 0;   // Number of half steps, from initial position
 
-float absol_pos_mm = 0;     // position from the x=0 in mm, absolute position
-float relat_pos_mm = 0;     // position from the initial position of the experimet, relative
-
+float absol_pos_mm = 0; // position from the x=0 in mm, absolute position
+// position from the initial position of the experimet, relative
+float relat_pos_mm_stp = 0; // calculated from halfsteps
+float relat_pos_mm_lin = 0; // calculated from lines
  
 
 // array for the time of a half of a microstep (half time low, half high)
@@ -690,6 +693,7 @@ void init_screen()
   
 }
 
+// ---------------- homing screen
 
 void homing_screen()
 {
@@ -727,15 +731,16 @@ void homing_screen()
   lcd.write(CHR_MM);
   lcd.write(CHR_PER_HOUR);
 
+           //7890123456789
   lcd.print(" |00h 00m 00s");
 
   // -- row 2 steps
   row = 2;
   lcd.setCursor(0, row);
-         //  01234567
+         //  0123456
   lcd.print("dS=-  0");
   lcd.write(CHR_MM);
-
+           //8901
   lcd.print("|hs=");
 
   // -- row 3 lines
@@ -752,6 +757,82 @@ void homing_screen()
   // endstop print
   lcd.setCursor(19, 3);
   lcdprint_endstops();
+}
+
+
+// -------------- homing
+// update the homing variables on the screen
+// this function stays in a loop until the inital enstop is active
+
+void homing() {
+
+  // no need to use global vars o static, we remain in this function
+
+  // local copies to work with them
+  unsigned long hstp_cnt_copy;
+  short         lps_line_cnt_copy;
+  short         hour_cnt_copy;
+  // for seconds minutes is not necessary because they are byte
+
+  // to compare
+  unsigned long hstp_cnt_prev     = 0;
+  short         lps_line_cnt_prev = 0;
+  byte          sec_cnt_prev      = 0;
+  byte          minute_cnt_prev   = 0;
+  short         hour_cnt_prev     = 0;
+
+  while (endstop_x_ini == ENDSTOP_OFF) {
+
+    // disable interrupts to make a copy to avoid corruption
+    // for seconds minutes is not necessary because they are byte
+    noInterrupts();
+    hstp_cnt_copy     = hstp_cnt;
+    lps_line_cnt_copy = lps_line_cnt;
+    hour_cnt_copy     = hour_cnt;
+    interrupts();
+
+    if (hstp_cnt_copy != hstp_cnt_prev) {
+      lcd.setCursor(4, 2);
+      relat_pos_mm_stp = ADVAN_HSTEP * hstp_cnt_copy;
+      lcdprint_rght(int(relat_pos_mm_stp),3);
+      lcd.setCursor(12, 2);
+      lcd.print(hstp_cnt_copy);
+      hstp_cnt_prev = hstp_cnt_copy;
+    }
+
+    if (lps_line_cnt_copy != lps_line_cnt_prev) {
+      lcd.setCursor(4, 3);
+      relat_pos_mm_lin = mm_per_lps_line * lps_line_cnt_copy;
+      lcdprint_rght(int(relat_pos_mm_lin),3);
+      lcd.setCursor(12, 3);
+      lcd.print(lps_line_cnt_copy);
+      lps_line_cnt_prev = lps_line_cnt_copy;
+    }
+    
+    if (sec_cnt != sec_cnt_prev) {
+      if (minute_cnt != minute_cnt_prev) {
+        if (hour_cnt_copy != hour_cnt_prev) {
+          lcd.setCursor(9, 1);
+          lcdprint_rght(hour_cnt_copy,2);
+          hour_cnt_prev = hour_cnt_copy;
+        }
+        lcd.setCursor(13, 1);
+        lcdprint_rght(minute_cnt,2);
+        minute_cnt_prev = minute_cnt;
+      }
+      lcd.setCursor(17, 1);
+      lcdprint_rght(sec_cnt,2);
+      sec_cnt_prev = sec_cnt;
+    }
+
+    // endstop print, it reads the enstops, for the while
+    lcd.setCursor(19, 3);
+    lcdprint_endstops();
+  }
+
+  // deactivate interrupts
+  // save values in EEPROM
+  // HOMED state
 }
 
 
@@ -888,7 +969,17 @@ void experimento() {
 
 void second_cnt_isr() {
   
-  sec_cnt ++;
+  if (sec_cnt == 59) {
+    sec_cnt = 0;
+    if (minute_cnt == 59) {
+      minute_cnt = 0;
+      hour_cnt ++;
+    } else {
+      minute_cnt ++;
+    }
+  } else {
+    sec_cnt ++;
+  }
 }
 
 
@@ -1601,7 +1692,7 @@ void loop() {
       }
       break;
     case ST_HOMING: 
-      
+      homing();
       break;
 
     case ST_RUN: 

@@ -74,8 +74,9 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 #define LPS_ENC2_PIN  21  // PIN del canal B del encoder
 
 
-volatile int lps_line_cnt = 0;    // number of counted lines of the linear position sensor
-const float mm_per_lps_line = 0.160; // milimiters per line from linear pos sensor
+// in 400 mm there are about 2362 lines, so a int, or a short is enough
+volatile short lps_line_cnt = 0;    // number of counted lines of the linear position sensor
+const float mm_per_lps_line = 0.1693; // milimiters per line from linear pos sensor
 float lps_mm = 0;    // milimeters count by the linear position sensor (lps)
 
 // --- endstop values
@@ -103,6 +104,8 @@ const float ADVAN_HSTEP = float(LEAD) / (HSTEP_REV * GEAR_R);
 
 // ---- variables for keeping track the experiment timing
 
+// and experiment could take 400 hours if 400 mm at 1mm/h, it is not likely
+// but just in case, make it short, not byte
 short hour_cnt = 0;        // Keep track of the number of hours of the experiment
 byte minute_cnt = 0;       // Keep track of the number of minutes of the experiment
 volatile byte sec_cnt = 0; // Keep track of the number of seconds of the experiment
@@ -127,17 +130,31 @@ short rel_dest_updated = 0;
 
 short abs_init = -1;  // absolute initial position, if -1 is unknown
 
-byte usteps_cnt = 0;    // Number of usteps 0 to 15
-volatile unsigned long tot_halfstep_cnt = 0;  // Number of half steps, from pos  0
-volatile unsigned long halfstep_cnt = 0;     // Number of half steps, from initial position
+volatile byte h_ustp_cnt = 0;    // Number of half usteps in a halfstep 0 to 31
+
+// Number of half steps counted. a long has 32 bits -> being unsigned
+// from 0 to 4,294,967,295
+// 400 mm, with 3mm lead, 400 halfsteps per turn and 51 reduction,
+// gives 0,147 um/halfstep, which is 
+//               2,714,666.67 halfsteps (22 bits) So we can count them
+volatile unsigned long hstp_cnt = 0;   // Number of half steps, from initial position
+
 float absol_pos_mm = 0;     // position from the x=0 in mm, absolute position
 float relat_pos_mm = 0;     // position from the initial position of the experimet, relative
 
-// El siguiente vector muestra los tiempos de cada medio micropaso dependiendo de la velocidad seleccionado. Este vector se encuentra en un .csv en el GitHub del autor del trabajo
-float array_t_half_ustep[] = {0,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,199.33,196.95,194.64,192.37,190.16,188.00,185.89,183.82,181.80,179.83,177.89,176.00,174.15,172.33,170.56,168.82,167.11,165.44};
+ 
 
-// El siguiente vector muestra los tiempos de cada medio paso dependiendo de la velocidad seleccionado. Este vector se encuentra en un .csv en el GitHub del autor del trabajo
-float array_t_half_step[] = {0,529411.76,264705.88,176470.59,132352.94,105882.35,88235.29,75630.25,66176.47,58823.53,52941.18,48128.34,44117.65,40723.98,37815.13,35294.12,33088.24,31141.87,29411.76,27863.78,26470.59,25210.08,24064.17,23017.90,22058.82,21176.47,20361.99,19607.84,18907.56,18255.58,17647.06,17077.80,16544.12,16042.78,15570.93,15126.05,14705.88,14308.43,13931.89,13574.66,13235.29,12912.48,12605.04,12311.90,12032.09,11764.71,11508.95,11264.08,11029.41,10804.32,10588.24,10380.62,10181.00,9988.90,9803.92,9625.67,9453.78,9287.93,9127.79,8973.08,8823.53,8678.88,8538.90,8403.36,8272.06,8144.80,8021.39,7901.67,7785.47,7672.63,7563.03,7456.50,7352.94,7252.22,7154.21,7058.82,6965.94,6875.48,6787.33,6701.41,6617.65,6535.95,6456.24,6378.45,6302.52,6228.37,6155.95,6085.19,6016.04,5948.45,5882.35,5817.71,5754.48,5692.60,5632.04,5572.76,5514.71,5457.85,5402.16,5347.59,5294.12};
+// array for the time of a half of a microstep (half time low, half high)
+// For  3mm lead, 400 halfsteps per turn and 51 reduction, the fastest
+// speeds, from 83mm/h and up, the h_ustp take less than 200 us
+// for speed from 1mm/h to 82 mm/h, the h_microstp take 200 us
+
+const float vec_t_h_ustp[] = {0,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,199.33,196.95,194.64,192.37,190.16,188.00,185.89,183.82,181.80,179.83,177.89,176.00,174.15,172.33,170.56,168.82,167.11,165.44};
+
+// array for the time of a half step (h_stp), it is only used when the time
+// a half microstep (h_ustp) is lower than 200. Otherwise, they would be out
+// of sync
+const float vec_t_h_stp[] = {0,529411.76,264705.88,176470.59,132352.94,105882.35,88235.29,75630.25,66176.47,58823.53,52941.18,48128.34,44117.65,40723.98,37815.13,35294.12,33088.24,31141.87,29411.76,27863.78,26470.59,25210.08,24064.17,23017.90,22058.82,21176.47,20361.99,19607.84,18907.56,18255.58,17647.06,17077.80,16544.12,16042.78,15570.93,15126.05,14705.88,14308.43,13931.89,13574.66,13235.29,12912.48,12605.04,12311.90,12032.09,11764.71,11508.95,11264.08,11029.41,10804.32,10588.24,10380.62,10181.00,9988.90,9803.92,9625.67,9453.78,9287.93,9127.79,8973.08,8823.53,8678.88,8538.90,8403.36,8272.06,8144.80,8021.39,7901.67,7785.47,7672.63,7563.03,7456.50,7352.94,7252.22,7154.21,7058.82,6965.94,6875.48,6787.33,6701.41,6617.65,6535.95,6456.24,6378.45,6302.52,6228.37,6155.95,6085.19,6016.04,5948.45,5882.35,5817.71,5754.48,5692.60,5632.04,5572.76,5514.71,5457.85,5402.16,5347.59,5294.12};
 
 
 // ---------------- FINITE STATE MACHINES (FSM)
@@ -359,13 +376,8 @@ void setup() {
   lcd.createChar(CHR_PER_HOUR, IC_PER_HOUR);   // 7: per hour
  
   digitalWrite(X_ENABLE_PIN , LOW);  // Stepper motor enable. Active-low
+  digitalWrite(X_STEP_PIN , LOW);  // dont step at start
 
-  // interrupt for the linear position sensor
-  attachInterrupt(digitalPinToInterrupt(LPS_ENC1_PIN), lin_encoder, RISING);
-
-  // interrupt for the counter of seconds, to keep track of the time 
-  Timer3.initialize(1000000);             // A million microseconds to count seconds
-  Timer3.attachInterrupt(SecondsCounter); // Second counter
   
 }
 
@@ -756,7 +768,7 @@ void experimento() {
     lcd.print(tot_halfstep_cnt);
 
     absol_pos_mm = (ADVAN_HSTEP * tot_halfstep_cnt);   // each halfstep
-    relat_pos_mm = (ADVAN_HSTEP * halfstep_cnt);
+    relat_pos_mm = (ADVAN_HSTEP * hstp_cnt);
 
     lcd.setCursor(0, 3);
     lcd.print("Avance: ");
@@ -810,64 +822,102 @@ void experimento() {
 
 // -------------- Interrupt function to count seconds
 
-void SecondsCounter() {
+void second_cnt_isr() {
   
-  if (exp_pass_init == true && fin ==0) {
-    sec_cnt ++;
-  }
+  sec_cnt ++;
 }
 
 
 // -------------- Interrupt function to count the microsteps and generate
 // ------ the pulses for the motor
+// -- this is for the fast speeds, when the halfsteps interrupt is not needed
 
-void gen_usteps() {
-  static byte step_value = LOW;     // signal to send to stepper motor pin
+void h_ustp_fast_isr() {
+  // this is local, independent from the half_step count (hstp_isr)
+  // unlike the h_ustp_slow_isr, that is initialized by hstp_isr, so they
+  // use a global variable
+  static byte h_ustp_cnt_loc = 0;
 
-  /*
-  if (ui_state == ST_RUN && (absol_pos_mm < pos_x_end) && fin == 0){
-    if (usteps_cnt < 16){
-      digitalWrite(X_STEP_PIN , step_value);
-      if (step_value == LOW){
-         step_value = HIGH;
-         usteps_cnt++;
-      } else{
-         step_value = LOW;
-      }
-    }
-  }*/
+  // a half step has 16 microsteps, but 32 half of a ustep, half of the time
+  // low, and the other high
+  if (h_ustp_cnt_loc == 31){
+    h_ustp_cnt_loc = 0;
+    hstp_cnt ++;  // increment halfsteps
+  } else {
+    h_ustp_cnt_loc ++;
+  }
+  //first time, it was 0 until the interruption comes
+  digitalWrite(X_STEP_PIN , bitRead(h_ustp_cnt_loc,0));
+
+
+  /* other option
+  static byte step_value = LOW; // signal to send to stepper motor pin
+  // this is local, independent from the half_step count (hstp_isr)
+  // unlike the h_ustp_slow_isr, that is initialized by hstp_isr, so they
+  // use a global variable
+  static h_ustp_cnt_loc = 0;
+
+  step_value = !step_value;
+  digitalWrite(X_STEP_PIN , step_value); //first time, it was 0, for the interval
+  // a half step has 16 microsteps, but 32 half of a ustep, half of the time
+  // low, and the other high
+  if (h_ustp_cnt_loc == 31){
+    h_ustp_cnt_loc = 0;
+    hstp_cnt ++;  // increment halfsteps
+  } else {
+    h_ustp_cnt_loc ++;
+  }
+  */
+
+}
+
+// -------------- Interrupt function to count the microsteps and generate
+// ------ the pulses for the motor
+
+void h_ustp_slow_isr() {
+  // this function uses a global volatile h_ustp_cnt variable, unlike
+  // h_ustp_fast_isr
+  // here is global because it has to be initialized by hstp_isr
+
+  if (h_ustp_cnt < 32) {
+    h_ustp_cnt ++;
+    //first time, it was 0, for the interval
+    digitalWrite(X_STEP_PIN, bitRead(h_ustp_cnt,0));
+  }
+
+
+  /* another option
+  static byte step_value = LOW; // signal to send to stepper motor pin
+  // this function uses a global h_ustp_cnt variable, unlike h_ustp_fast_isr
+  // here is global because it has to be initialized by hstp_isr
+
+  if (h_ustp_cnt < 32) {
+    step_value = !step_value;
+    digitalWrite(X_STEP_PIN , step_value); //first time, it was 0, for the interval
+    h_ustp_cnt ++;
+  }
+  */
 }
 
 // -------------- Interrupt function to count the number of halfsteps
 
-void MedioPaso() {
-  usteps_cnt = 0; // initialize the ustpes
-  /*
-  if (exp_homed == true && fin ==0 && (absol_pos_mm < pos_x_end)){ 
-    tot_halfstep_cnt ++;
-  }
-    
-  if (ADVAN_HSTEP * tot_halfstep_cnt > pos_x_ini){
-    halfstep_cnt ++;
-  }*/
+void hstp_isr() {
+  h_ustp_cnt  = 0; // initialize the ustpes
+
+  hstp_cnt ++;
 }
 
-// linear encoder interrupt to read lines
-void lin_encoder() {
-    // not used, just in the interrupt
-    //int lps_enc1;          // Value of linear encoder channel 1
-    byte lps_enc2;          // Value of linear position sensor (lps) encoder channel 2
+// -------------  linear encoder interrupt to read lines
+void lin_encoder_isr() {
+  byte lps_enc2;   // Value of linear position sensor (lps) encoder channel 2
 
-    if (exp_pass_init == true && fin == 0) {
-      // linear position sensor encoder channel 2
-      lps_enc2 = digitalRead (LPS_ENC2_PIN); // linear position sensor encoder 
-      if (lps_enc2 == LOW){
-        lps_line_cnt++;
-      }
-      else{
-        lps_line_cnt--;
-      }
-    }
+  // linear position sensor encoder channel 2
+  lps_enc2 = digitalRead (LPS_ENC2_PIN); // linear position sensor encoder 
+  if (lps_enc2 == LOW){
+    lps_line_cnt++;
+  } else{
+    lps_line_cnt--;
+  }
 }
 
 
@@ -1274,6 +1324,44 @@ void update_confirm_menu ()
 }
 
 
+// ---------------- enable interrupts
+// when starting the experiment
+
+void enable_isr()
+{
+  // it is byte because is less than 200
+  byte t_half_ustp; // time that a half microstep takes
+  unsigned long t_half_stp; // time that a half of a step takes
+
+  t_half_ustp = ((byte)vec_t_h_ustp[vel_mmh]);
+
+  // interrupt for the linear position sensor
+  attachInterrupt(digitalPinToInterrupt(LPS_ENC1_PIN),
+                  lin_encoder_isr, RISING);
+
+  // interrupt for the counter of seconds, to keep track of the time 
+  Timer3.attachInterrupt(second_cnt_isr); // Second counter
+  Timer3.initialize(1000000);   // A million microseconds to count seconds
+
+
+  if (t_half_ustp == 200) { // slow speed
+    t_half_stp = ((unsigned long)(vec_t_h_stp[vel_mmh]));
+
+    // attach function for half micro steps interruption
+    Timer1.attachInterrupt(h_ustp_slow_isr);
+    // attach function for halfsteps interruption
+    Timer4.attachInterrupt(hstp_isr); 
+
+    Timer4.initialize(t_half_stp);
+
+  } else { // fast speed,no half step timer
+    // attach function for half micro steps interruption
+    Timer1.attachInterrupt(h_ustp_fast_isr);
+
+  }
+  Timer1.initialize(t_half_ustp);
+}
+
 
 
 void loop() {
@@ -1429,6 +1517,7 @@ void loop() {
           } else {
             ui_state = ST_RUN;
           }
+          enable_isr(); // enable interrupts for the experiment
         } else {
           ui_state = ST_SEL_PARAMS;
           param_menu();
@@ -1447,34 +1536,11 @@ void loop() {
       }
       break;
     case ST_HOMING: 
-
-
-      t_half_ustep = ((unsigned long)array_t_half_ustep[vel_mmh]);     
-      // attach function for half micro steps interruption
-      Timer1.attachInterrupt(gen_usteps);     
-      Timer1.initialize(t_half_ustep);
-
-      // attach function for halfsteps interruption
-      Timer4.attachInterrupt(MedioPaso); 
-      t_half_step = ((unsigned long)(array_t_half_step[vel_mmh]));  
-      Timer4.initialize(t_half_step);
-     
-      experimento();
+      
       break;
 
     case ST_RUN: 
-      lcd.clear();
-      t_half_ustep = ((unsigned long)array_t_half_ustep[vel_mmh]);     
-      // attach function for half micro steps interruption
-      Timer1.attachInterrupt(gen_usteps);     
-      Timer1.initialize(t_half_ustep);
-
-      // attach function for halfsteps interruption
-      Timer4.attachInterrupt(MedioPaso); 
-      t_half_step = ((unsigned long)(array_t_half_step[vel_mmh]));  
-      Timer4.initialize(t_half_step);
-     
-      experimento();
+      
       break;    
     case ST_END:
       break;

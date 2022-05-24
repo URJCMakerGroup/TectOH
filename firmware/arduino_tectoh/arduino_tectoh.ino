@@ -68,6 +68,16 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 #define X_DIR_PIN 55        // DIR pin for the first stepper motor driver (axis X)
 #define X_ENABLE_PIN 38     // ENABLE pin for the first stepper motor driver (axis X)
 
+// defined in configuration file: tectoh_config.h
+#if DIR_MOTOR_POS_HIGH
+  #define DIR_MOTOR_POS HIGH
+  #define DIR_MOTOR_NEG LOW
+#else
+  #define DIR_MOTOR_POS LOW
+  #define DIR_MOTOR_NEG HIGH
+#endif
+
+
 // ------------ Linear position sensor LPS
   
 #define LPS_ENC1_PIN  20  // Linear position encoder 1 pin
@@ -221,6 +231,9 @@ bool rot_enc_left   = false;  // if LCD rotary encoder turned counter cw <-
 #define CHR_HL_DIAM   0
 #define CHR_FL_DIAM   1
 
+#define CHR_X0   0 // in different screens
+#define CHR_XF   1
+
 #define CHR_HL_HL_BOX  2
 #define CHR_HL_FL_BOX  3
 #define CHR_FL_HL_BOX  4
@@ -230,8 +243,9 @@ bool rot_enc_left   = false;  // if LCD rotary encoder turned counter cw <-
 #define CHR_PER_HOUR   7
 
 
-#define CHR_MICRO       228 // 0xE4: it is in the LCD charset
-#define CHR_BCK_ARROW   127 // 0x7F: it is in the LCD charset
+#define CHR_MICRO        228 // 0xE4: it is in the LCD charset
+#define CHR_RGHT_ARROW   126 // 0x7E: it is in the LCD charset
+#define CHR_LEFT_ARROW   127 // 0x7F: it is in the LCD charset
 
 
 const byte IC_HL_DIAM[8] = // icon hollow diamond
@@ -320,6 +334,31 @@ byte IC_PER_HOUR[8] = // icon per hour
   B00111,
   B00101,
 };
+
+byte IC_X0[8] = // X_0
+{
+  B10100,
+  B01000,
+  B10100,
+  B00000,
+  B00111,
+  B00101,
+  B00101,
+  B00111,
+};
+
+byte IC_XF[8] = // X_F
+{
+  B10100,
+  B01000,
+  B10100,
+  B00000,
+  B00111,
+  B00100,
+  B00110,
+  B00100,
+};
+
 
 byte IC_PER_HOUR2[8] = // per hour
 {
@@ -656,12 +695,28 @@ void homing_screen()
 {
   byte row = 0;
 
+  lcd.createChar(CHR_X0, IC_X0); //
+  lcd.createChar(CHR_XF, IC_XF); //
+
   lcd.clear();
   // -- row 0 
   row = 0;
   lcd.setCursor(0, row);
-           //01234567890123456789
-  lcd.print("  HOMING: xf=  0");
+  lcd.write(CHR_RGHT_ARROW);
+           //1234567890123456789
+  lcd.print("HOME:");
+  lcd.write(CHR_XF);
+  lcd.print("=  0");
+  lcd.write(CHR_MM);
+
+  lcd.print("|");
+  lcd.write(byte(CHR_X0));
+  lcd.print("=");
+  if (pos_x_eeprom == -1) {
+    lcd.print("  ?");
+  } else {
+    lcdprint_rght(pos_x_eeprom,3);
+  }
   lcd.write(CHR_MM);
 
   // -- row 1 
@@ -671,20 +726,28 @@ void homing_screen()
   lcdprint_rght(vel_mmh,3);
   lcd.write(CHR_MM);
   lcd.write(CHR_PER_HOUR);
-  lcd.print(" | xo=");
-  if (pos_x_eeprom == -1) {
-    lcd.print("  ?");
-  } else {
-    lcdprint_rght(pos_x_eeprom,3);
-  }
-  lcd.write(CHR_MM);
 
-  // -- row 2 
+  lcd.print(" |00h 00m 00s");
+
+  // -- row 2 steps
   row = 2;
   lcd.setCursor(0, row);
-  lcd.print("di="); //col 0-2
-                    //+###mm col 3-9
-  lcd.setCursor(7, row+1);
+         //  01234567
+  lcd.print("dS=-  0");
+  lcd.write(CHR_MM);
+
+  lcd.print("|hs=");
+
+  // -- row 3 lines
+  row = 3;
+  lcd.setCursor(0, row);
+
+         //  01234567
+  lcd.print("dL=-  0");
+  lcd.write(CHR_MM);
+
+  lcd.print("|lin=    0");
+
 
   // endstop print
   lcd.setCursor(19, 3);
@@ -789,7 +852,8 @@ void experimento() {
   
   if (exp_homed == false && fin == 0) {
     lcd.setCursor(0, 0);
-    lcd.print("HOMING");
+    lcd.write(CHR_RGHT_ARROW);
+    lcd.print("HOME");
   } else if (exp_pass_init == true && fin ==0 && (absol_pos_mm < pos_x_end)){  
       if (sec_cnt == 60)  {
         sec_cnt = 0;
@@ -1083,7 +1147,7 @@ void param_menu ()
   }
   lcd.setCursor(1, 3);
   lcd.print("Back");
-  lcd.write(CHR_BCK_ARROW);
+  lcd.write(CHR_LEFT_ARROW);
 
   // aditional info:
   lcd.setCursor(LCD_EEP_POS_COL, 3);
@@ -1277,7 +1341,7 @@ void confirm_menu ()
   }
   lcd.setCursor(1, 3);
   lcd.print("Cancel");
-  lcd.write(CHR_BCK_ARROW);
+  lcd.write(CHR_LEFT_ARROW);
 
   // aditional info:
   lcd.setCursor(LCD_EEP_POS_COL, 3);
@@ -1514,6 +1578,7 @@ void loop() {
           if (task_st == TASK_HOME) {
             ui_state = ST_HOMING;
             homing_screen();
+            digitalWrite(X_DIR_PIN, DIR_MOTOR_NEG); //homing:  motor back
           } else {
             ui_state = ST_RUN;
           }

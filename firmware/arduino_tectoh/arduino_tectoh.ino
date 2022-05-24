@@ -201,19 +201,23 @@ bool rot_enc_left   = false;  // if LCD rotary encoder turned counter cw <-
 
 // New symbols only 7
 
-#define HOL_DIAM     0
-#define FUL_DIAM     1
-#define MICRO        2
-#define HOL_HOL_BOX  3
-#define HOL_FUL_BOX  4
-#define FUL_HOL_BOX  5
-#define FUL_FUL_BOX  6
-#define BACK_ARROW   7
+#define CHR_HL_DIAM   0
+#define CHR_FL_DIAM   1
 
-//#define HOL_BOX      4
-//#define FUL_BOX      5
+#define CHR_HL_HL_BOX  2
+#define CHR_HL_FL_BOX  3
+#define CHR_FL_HL_BOX  4
+#define CHR_FL_FL_BOX  5
 
-byte hol_diam[8] = // 0: hollow diamond
+#define CHR_MM         6
+#define CHR_PER_HOUR   7
+
+
+#define CHR_MICRO       228 // 0xE4: it is in the LCD charset
+#define CHR_BCK_ARROW   127 // 0x7F: it is in the LCD charset
+
+
+const byte IC_HL_DIAM[8] = // icon hollow diamond
 {
   B00000,
   B00100,
@@ -223,7 +227,7 @@ byte hol_diam[8] = // 0: hollow diamond
   B01010,
   B00100,
 };
-byte ful_diam[8] = // 1: full diamond
+const byte IC_FL_DIAM[8] = // icon full diamond
 {
   B00000,
   B00100,
@@ -233,91 +237,93 @@ byte ful_diam[8] = // 1: full diamond
   B01110,
   B00100,
 };
-byte micro[8] =  // 2: micro symbol
+
+const byte IC_HL_HL_BOX[8] = // icon two hollow boxes
 {
+  B11111,
+  B10001,
+  B10001,
+  B11111,
+  B10001,
+  B10001,
+  B11111,
+};
+
+const byte IC_HL_FL_BOX[8] = // icon one hollow one full box
+{
+  B11111,
+  B10001,
+  B10001,
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+};
+
+const byte IC_FL_HL_BOX[8] = // icon one full and other hollow box
+{
+  B11111,
+  B11111,
+  B11111,
+  B11111,
+  B10001,
+  B10001,
+  B11111,
+};
+
+const byte IC_FL_FL_BOX[8] = // two full boxes
+{
+  B11111,
+  B11111,
+  B11111,
   B00000,
-  B10001,
-  B10001,
-  B11011,
+  B11111,
+  B11111,
+  B11111,
+};
+
+const byte IC_MM[8] = // millimiter
+{
+  B11010,
   B10101,
-  B10000,
-  B10000,
-};
-byte back_arrow[8] =  // 3: back arrow (return)
-{
+  B10101,
   B00000,
-  B00001,
-  B00001,
-  B00001,
-  B01001,
-  B11111,
+  B11010,
+  B10101,
+  B10101,
+};
+
+byte IC_PER_HOUR[8] = // icon per hour
+{
+  B00010,
+  B00100,
   B01000,
+  B10000,
+  B00101,
+  B00111,
+  B00101,
 };
 
-byte hol_box[8] = // 4: hollow box
+byte IC_PER_HOUR2[8] = // per hour
 {
-  B11111,
-  B10001,
-  B10001,
-  B10001,
-  B10001,
-  B10001,
-  B11111,
+  B01000,
+  B01000,
+  B10000,
+  B10100,
+  B00100,
+  B00111,
+  B00101,
 };
 
-byte ful_box[8] = // 5: full box
+byte IC_PER_HOUR3[8] = // per hour
 {
-  B11111,
-  B11111,
-  B11111,
-  B11111,
-  B11111,
-  B11111,
-  B11111,
-};
-
-byte hol_hol_box[8] = // 6: two hollow boxes
-{
-  B11111,
-  B10001,
-  B10001,
-  B11111,
-  B10001,
-  B10001,
-  B11111,
-};
-
-byte hol_ful_box[8] = // 7: one hollow one full box
-{
-  B11111,
-  B10001,
-  B10001,
-  B11111,
-  B11111,
-  B11111,
-  B11111,
-};
-
-byte ful_hol_box[8] = // 8: one full and other hollow box
-{
-  B11111,
-  B11111,
-  B11111,
-  B11111,
-  B10001,
-  B10001,
-  B11111,
-};
-
-byte ful_ful_box[8] = // 8: two full boxes
-{
-  B11111,
-  B11111,
-  B11111,
-  B00000,
-  B11111,
-  B11111,
-  B11111,
+  B00100,
+  B01000,
+  B10000,
+  B00100,
+  B00100,
+  B00111,
+  B00101,
 };
 
 void setup() {
@@ -340,17 +346,17 @@ void setup() {
   pinMode(X_ENABLE_PIN , OUTPUT);
 
   // creation of new lcd characters
-  lcd.createChar(HOL_DIAM, hol_diam); // 0: hollow diamond
-  lcd.createChar(FUL_DIAM, ful_diam); // 1: full diamond
-  lcd.createChar(MICRO,    micro);    // 2: micro symbol
-  //lcd.createChar(HOL_BOX   , hol_box);  //  : hollow box
-  //lcd.createChar(FUL_BOX   , ful_box);  //  : full box
-  lcd.createChar(HOL_HOL_BOX, hol_hol_box); // 3: hollow + hollow box
-  lcd.createChar(HOL_FUL_BOX, hol_ful_box); // 4: hollow + full box
+  //             char number     icon
+  lcd.createChar(CHR_HL_DIAM, IC_HL_DIAM); // 0: hollow diamond
+  lcd.createChar(CHR_FL_DIAM, IC_FL_DIAM); // 1: full diamond
 
-  lcd.createChar(FUL_HOL_BOX, ful_hol_box); // 5: full + hollow box
-  lcd.createChar(FUL_FUL_BOX, ful_ful_box); // 6: full + full box
-  lcd.createChar(BACK_ARROW, back_arrow);   // 7: back arrow (return)
+  lcd.createChar(CHR_HL_HL_BOX, IC_HL_HL_BOX); // 2: hollow + hollow box
+  lcd.createChar(CHR_HL_FL_BOX, IC_HL_FL_BOX); // 3: hollow + full box
+  lcd.createChar(CHR_FL_HL_BOX, IC_FL_HL_BOX); // 4: full + hollow box
+  lcd.createChar(CHR_FL_FL_BOX, IC_FL_FL_BOX); // 5: full + full box
+
+  lcd.createChar(CHR_MM, IC_MM);               // 6: milimiter
+  lcd.createChar(CHR_PER_HOUR, IC_PER_HOUR);   // 7: per hour
  
   digitalWrite(X_ENABLE_PIN , LOW);  // Stepper motor enable. Active-low
 
@@ -598,15 +604,15 @@ void lcdprint_endstops()
   
   if (endstop_x_ini == ENDSTOP_ON) {
     if (endstop_x_end == ENDSTOP_ON) {
-      lcd.write(byte(FUL_FUL_BOX));
+      lcd.write(byte(CHR_FL_FL_BOX));
     } else {
-      lcd.write(byte(FUL_HOL_BOX));
+      lcd.write(byte(CHR_FL_HL_BOX));
     }
   } else {
     if (endstop_x_end == ENDSTOP_ON) {
-      lcd.write(byte(HOL_FUL_BOX));
+      lcd.write(byte(CHR_HL_FL_BOX));
     } else {
-      lcd.write(byte(HOL_HOL_BOX));
+      lcd.write(byte(CHR_HL_HL_BOX));
     }
   }
 }
@@ -634,6 +640,44 @@ void init_screen()
 }
 
 
+void homing_screen()
+{
+  byte row = 0;
+
+  lcd.clear();
+  // -- row 0 
+  row = 0;
+  lcd.setCursor(0, row);
+           //01234567890123456789
+  lcd.print("  HOMING: xf=  0");
+  lcd.write(CHR_MM);
+
+  // -- row 1 
+  row = 1;
+  lcd.setCursor(0, row);
+  lcd.print("v=");
+  lcdprint_rght(vel_mmh,3);
+  lcd.write(CHR_MM);
+  lcd.write(CHR_PER_HOUR);
+  lcd.print(" | xo=");
+  if (pos_x_eeprom == -1) {
+    lcd.print("  ?");
+  } else {
+    lcdprint_rght(pos_x_eeprom,3);
+  }
+  lcd.write(CHR_MM);
+
+  // -- row 2 
+  row = 2;
+  lcd.setCursor(0, row);
+  lcd.print("di="); //col 0-2
+                    //+###mm col 3-9
+  lcd.setCursor(7, row+1);
+
+  // endstop print
+  lcd.setCursor(19, 3);
+  lcdprint_endstops();
+}
 
 
 //////////////// ESTADO 3 ////////////////
@@ -875,17 +919,17 @@ void task_menu()
   } else {
     lcdprint_rght(pos_x_eeprom,3);
   }
-  lcd.print("mm");
+  lcd.write(CHR_MM);
 
   lcd.setCursor(0, 0);
   if (task_st == TASK_HOME) {
-    lcd.write(byte(FUL_DIAM));
+    lcd.write(byte(CHR_FL_DIAM));
     lcd.setCursor(0, 1);
-    lcd.write(byte(HOL_DIAM));
+    lcd.write(byte(CHR_HL_DIAM));
   } else {
-    lcd.write(byte(HOL_DIAM));
+    lcd.write(byte(CHR_HL_DIAM));
     lcd.setCursor(0, 1);
-    lcd.write(byte(FUL_DIAM));
+    lcd.write(byte(CHR_FL_DIAM));
   }
 
   // endstop print
@@ -905,13 +949,13 @@ void update_task_menu()
     // draw the diamonds
     lcd.setCursor(0, 0);
     if (task_st == TASK_HOME) {
-      lcd.write(byte(FUL_DIAM));
+      lcd.write(byte(CHR_FL_DIAM));
       lcd.setCursor(0, 1);
-      lcd.write(byte(HOL_DIAM));
+      lcd.write(byte(CHR_HL_DIAM));
     } else {
-      lcd.write(byte(HOL_DIAM));
+      lcd.write(byte(CHR_HL_DIAM));
       lcd.setCursor(0, 1);
-      lcd.write(byte(FUL_DIAM));
+      lcd.write(byte(CHR_FL_DIAM));
     }
     // endstop print (just in case)
     lcd.setCursor(19, 3);
@@ -931,9 +975,9 @@ void param_menu ()
   // -- row 0
   lcd.setCursor(0, 0);
   if (selparam_st == SELPARAM_VEL) {
-    lcd.write(byte(FUL_DIAM));
+    lcd.write(byte(CHR_FL_DIAM));
   } else {
-    lcd.write(byte(HOL_DIAM));
+    lcd.write(byte(CHR_HL_DIAM));
   }
 
   lcd.setCursor(1, 0);
@@ -941,20 +985,22 @@ void param_menu ()
   lcd.setCursor(12, 0);
   lcdprint_rght(vel_mmh,3);
   lcd.setCursor(16, 0);
-  lcd.print("mm/h");
+  lcd.write(CHR_MM);
+  lcd.write(CHR_PER_HOUR);
 
   // -- row 1 
   lcd.setCursor(1, 1);
   if (task_st == TASK_HOME) {
-    lcd.print("Go Home: xf= 0 mm");
+    lcd.print("Go Home: xf= 0 ");
+    lcd.write(CHR_MM);
   } else {
     lcd.setCursor(0, 1);
     if (selparam_st == SELPARAM_DIST) {
-      lcd.write(byte(FUL_DIAM));
+      lcd.write(byte(CHR_FL_DIAM));
     } else {
-      lcd.write(byte(HOL_DIAM));
+      lcd.write(byte(CHR_HL_DIAM));
     }
-    lcd.print("Travel:");
+    lcd.print("Dist(d):");
     lcd.setCursor(11, 1);
     if (rel_dist_neg == true) {
       lcd.print("-");
@@ -964,15 +1010,15 @@ void param_menu ()
     lcd.setCursor(12, 1);
     lcdprint_rght(rel_dist,3);
     lcd.setCursor(16, 1);
-    lcd.print("mm");
+    lcd.write(CHR_MM);
   }
 
   // -- row 2 GO
   lcd.setCursor(0, 2);
   if (selparam_st == SELPARAM_GO) {
-    lcd.write(byte(FUL_DIAM));
+    lcd.write(byte(CHR_FL_DIAM));
   } else {
-    lcd.write(byte(HOL_DIAM));
+    lcd.write(byte(CHR_HL_DIAM));
   }
   lcd.setCursor(1, 2);
   lcd.print("Go!");
@@ -981,13 +1027,13 @@ void param_menu ()
   // -- row 3, go back
   lcd.setCursor(0, 3);
   if (selparam_st == SELPARAM_BACK) {
-    lcd.write(byte(FUL_DIAM));
+    lcd.write(byte(CHR_FL_DIAM));
   } else {
-    lcd.write(byte(HOL_DIAM));
+    lcd.write(byte(CHR_HL_DIAM));
   }
   lcd.setCursor(1, 3);
   lcd.print("Back");
-  lcd.write(byte(BACK_ARROW));
+  lcd.write(CHR_BCK_ARROW);
 
   // aditional info:
   lcd.setCursor(LCD_EEP_POS_COL, 3);
@@ -997,14 +1043,12 @@ void param_menu ()
   } else {
     lcdprint_rght(pos_x_eeprom,3);
   }
-  lcd.print("mm");
+  lcd.write(CHR_MM);
 
   // endstop print
   lcd.setCursor(19, 3);
   lcdprint_endstops();
 }
-
-
 
 
 void update_param_menu() {
@@ -1022,32 +1066,32 @@ void update_param_menu() {
 
       lcd.setCursor(0, 0);
       if (selparam_st == SELPARAM_VEL) {
-        lcd.write(byte(FUL_DIAM));
+        lcd.write(byte(CHR_FL_DIAM));
       } else {
-        lcd.write(byte(HOL_DIAM));
+        lcd.write(byte(CHR_HL_DIAM));
       }
       
       if (task_st != TASK_HOME) {
         lcd.setCursor(0, 1);
         if (selparam_st == SELPARAM_DIST) {
-          lcd.write(byte(FUL_DIAM));
+          lcd.write(byte(CHR_FL_DIAM));
         } else {
-          lcd.write(byte(HOL_DIAM));
+          lcd.write(byte(CHR_HL_DIAM));
         }
       }
 
       lcd.setCursor(0, 2);
       if (selparam_st == SELPARAM_GO) {
-        lcd.write(byte(FUL_DIAM));
+        lcd.write(byte(CHR_FL_DIAM));
       } else {
-        lcd.write(byte(HOL_DIAM));
+        lcd.write(byte(CHR_HL_DIAM));
       }
 
       lcd.setCursor(0, 3);
       if (selparam_st == SELPARAM_BACK) {
-        lcd.write(byte(FUL_DIAM));
+        lcd.write(byte(CHR_FL_DIAM));
       } else {
-        lcd.write(byte(HOL_DIAM));
+        lcd.write(byte(CHR_HL_DIAM));
       }
     }  
     if (ui_state != ui_state_prev ) {
@@ -1141,15 +1185,17 @@ void confirm_menu ()
   lcd.setCursor(12, 0);
   lcdprint_rght(vel_mmh,3);
   lcd.setCursor(16, 0);
-  lcd.print("mm/h");
+  lcd.write(CHR_MM);
+  lcd.write(CHR_PER_HOUR);
 
   // -- row 1 
   lcd.setCursor(1, 1);
   if (task_st == TASK_HOME) {
-    lcd.print("Go Home: xf= 0 mm");
+    lcd.print("Go Home: xf= 0 ");
+    lcd.write(CHR_MM);
   } else {
     lcd.setCursor(1, 1);
-    lcd.print("Travel:");
+    lcd.print("Dist(d):");
     lcd.setCursor(11, 1);
     if (rel_dist_neg == true) {
       lcd.print("-");
@@ -1159,15 +1205,15 @@ void confirm_menu ()
     lcd.setCursor(12, 1);
     lcdprint_rght(rel_dist,3);
     lcd.setCursor(16, 1);
-    lcd.print("mm");
+    lcd.write(CHR_MM);
   }
 
   // -- row 2 GO
   lcd.setCursor(0, 2);
   if (confirm_st == CONFIRM_YES) {
-    lcd.write(byte(FUL_DIAM));
+    lcd.write(byte(CHR_FL_DIAM));
   } else {
-    lcd.write(byte(HOL_DIAM));
+    lcd.write(byte(CHR_HL_DIAM));
   }
   lcd.setCursor(1, 2);
   lcd.print("Confirm");
@@ -1175,13 +1221,13 @@ void confirm_menu ()
   // -- row 3, go back
   lcd.setCursor(0, 3);
   if (confirm_st == CONFIRM_NO) {
-    lcd.write(byte(FUL_DIAM));
+    lcd.write(byte(CHR_FL_DIAM));
   } else {
-    lcd.write(byte(HOL_DIAM));
+    lcd.write(byte(CHR_HL_DIAM));
   }
   lcd.setCursor(1, 3);
   lcd.print("Cancel");
-  lcd.write(byte(BACK_ARROW));
+  lcd.write(CHR_BCK_ARROW);
 
   // aditional info:
   lcd.setCursor(LCD_EEP_POS_COL, 3);
@@ -1191,7 +1237,7 @@ void confirm_menu ()
   } else {
     lcdprint_rght(pos_x_eeprom,3);
   }
-  lcd.print("mm");
+  lcd.write(CHR_MM);
 
   // endstop print
   lcd.setCursor(19, 3);
@@ -1212,17 +1258,17 @@ void update_confirm_menu ()
   // -- row 2 GO
   lcd.setCursor(0, 2);
   if (confirm_st == CONFIRM_YES) {
-    lcd.write(byte(FUL_DIAM));
+    lcd.write(byte(CHR_FL_DIAM));
   } else {
-    lcd.write(byte(HOL_DIAM));
+    lcd.write(byte(CHR_HL_DIAM));
   }
 
   // -- row 3, Cancel
   lcd.setCursor(0, 3);
   if (confirm_st == CONFIRM_NO) {
-    lcd.write(byte(FUL_DIAM));
+    lcd.write(byte(CHR_FL_DIAM));
   } else {
-    lcd.write(byte(HOL_DIAM));
+    lcd.write(byte(CHR_HL_DIAM));
   }
 
 }
@@ -1379,6 +1425,7 @@ void loop() {
         if (confirm_st == CONFIRM_YES) {
           if (task_st == TASK_HOME) {
             ui_state = ST_HOMING;
+            homing_screen();
           } else {
             ui_state = ST_RUN;
           }
@@ -1400,10 +1447,8 @@ void loop() {
       }
       break;
     case ST_HOMING: 
-      //homing_screen();
 
 
-      lcd.clear();
       t_half_ustep = ((unsigned long)array_t_half_ustep[vel_mmh]);     
       // attach function for half micro steps interruption
       Timer1.attachInterrupt(gen_usteps);     

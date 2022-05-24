@@ -1,4 +1,4 @@
-//#include "config.h"
+#include "tectoh_config.h"
 
 // Libraries: https://docs.arduino.cc/software/ide-v1/tutorials/installing-libraries
 // https://www.arduino.cc/reference/en/libraries/timerone
@@ -81,6 +81,13 @@ float lps_mm = 0;    // milimeters count by the linear position sensor (lps)
 // --- endstop values
 byte endstop_x_ini;    // endstop value at x=0
 byte endstop_x_end;    // endstop value at the end
+
+//
+#if ENDSTOP_ACTIVE_HIGH
+  #define ENDSTOP_ON HIGH
+#else
+  #define ENDSTOP_ON LOW
+#endif
 
 const int TOT_LEN = 400;    // leadscrew length in mm, maximum distance
 const int MAX_VEL = 100;    // maximum velocity in mm/h
@@ -589,14 +596,14 @@ void lcdprint_endstops()
   endstop_x_ini = digitalRead(X_MIN_PIN);
   endstop_x_end = digitalRead(X_MAX_PIN);
   
-  if (endstop_x_ini == HIGH) {
-    if (endstop_x_end == HIGH) {
+  if (endstop_x_ini == ENDSTOP_ON) {
+    if (endstop_x_end == ENDSTOP_ON) {
       lcd.write(byte(FUL_FUL_BOX));
     } else {
       lcd.write(byte(FUL_HOL_BOX));
     }
   } else {
-    if (endstop_x_end == HIGH) {
+    if (endstop_x_end == ENDSTOP_ON) {
       lcd.write(byte(HOL_FUL_BOX));
     } else {
       lcd.write(byte(HOL_HOL_BOX));
@@ -637,7 +644,7 @@ void experimento() {
   endstop_x_ini = digitalRead(X_MIN_PIN);
   endstop_x_end = digitalRead(X_MAX_PIN);
   
-  if (endstop_x_ini == HIGH ) {
+  if (endstop_x_ini == ENDSTOP_ON ) {
     exp_homed = 1;
   }
 
@@ -827,10 +834,10 @@ void check_pos_x_eeprom()
   endstop_x_ini = digitalRead(X_MIN_PIN);
   endstop_x_end = digitalRead(X_MAX_PIN);
  
-  if (endstop_x_ini == HIGH) {
+  if (endstop_x_ini == ENDSTOP_ON) {
     pos_x_eeprom = 0;
     EEPROM.put(EEPROM_DIR, pos_x_eeprom);
-  } else if (endstop_x_end == HIGH) {
+  } else if (endstop_x_end == ENDSTOP_ON) {
     pos_x_eeprom = TOT_LEN; // AAA: this value has to be calculated
     EEPROM.put(EEPROM_DIR, pos_x_eeprom);
   } else { // not at the end or init

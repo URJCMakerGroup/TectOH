@@ -82,7 +82,7 @@ float lps_mm = 0;    // milimeters count by the linear position sensor (lps)
 byte endstop_x_ini;    // endstop value at x=0
 byte endstop_x_end;    // endstop value at the end
 
-//
+// defined in configuration file: tectoh_config.h
 #if ENDSTOP_ACTIVE_HIGH
   #define ENDSTOP_ON HIGH
 #else
@@ -96,7 +96,7 @@ const int LEAD = 3;  // lead screw lead in mm. How many mm advances per revoluti
 const int STEP_REV = 200; // how many steps per revolution the motor has
 const int HSTEP_REV = 2 * STEP_REV; // halfsteps per revolution
 
-const float GEAR_R = 51.0; // gear ratio of the motor
+const float GEAR_R = 51.0f; // gear ratio of the motor
 
 //advance in mm per halfstep
 const float ADVAN_HSTEP = float(LEAD) / (HSTEP_REV * GEAR_R);
@@ -119,7 +119,7 @@ short pos_x_eeprom;
 // to make some operations
 short vel_mmh = MAX_VEL;  // Speed of the Sandbox in mm/h, from 1 to 100
 short abs_dest = -1;  // absolute position of the destination, from x0 in mm
-short rel_dist = 0;  // relative position of the destination, from initial position
+short rel_dist = 1; // relative position of the destination, from initial position, mm
 bool  rel_dist_neg = false;  // sign of rel_dist: 0: positive, 1: negative
 // relative position of the destination, from actual position, it is update when
 // actual position changes
@@ -634,6 +634,8 @@ void init_screen()
 }
 
 
+
+
 //////////////// ESTADO 3 ////////////////
 
 void experimento() {
@@ -944,7 +946,7 @@ void param_menu ()
   // -- row 1 
   lcd.setCursor(1, 1);
   if (task_st == TASK_HOME) {
-    lcd.print("Go Home:  x = 0 mm");
+    lcd.print("Go Home: xf= 0 mm");
   } else {
     lcd.setCursor(0, 1);
     if (selparam_st == SELPARAM_DIST) {
@@ -1135,19 +1137,19 @@ void confirm_menu ()
   // -- row 0
 
   lcd.setCursor(1, 0);
-  lcd.print("Speed");
+  lcd.print("Speed:");
   lcd.setCursor(12, 0);
   lcdprint_rght(vel_mmh,3);
-  lcd.setCursor(18, 0);
+  lcd.setCursor(16, 0);
   lcd.print("mm/h");
 
   // -- row 1 
   lcd.setCursor(1, 1);
   if (task_st == TASK_HOME) {
-    lcd.print("Go Home: x = 0 mm");
+    lcd.print("Go Home: xf= 0 mm");
   } else {
-    lcd.setCursor(0, 1);
-    lcd.print("Travel dist.");
+    lcd.setCursor(1, 1);
+    lcd.print("Travel:");
     lcd.setCursor(11, 1);
     if (rel_dist_neg == true) {
       lcd.print("-");
@@ -1168,7 +1170,7 @@ void confirm_menu ()
     lcd.write(byte(HOL_DIAM));
   }
   lcd.setCursor(1, 2);
-  lcd.print("Start moving");
+  lcd.print("Confirm");
 
   // -- row 3, go back
   lcd.setCursor(0, 3);
@@ -1357,8 +1359,8 @@ void loop() {
                 rel_dist_neg = ! rel_dist_neg;
               } else {
                 aux_val = rel_dist + val_incr;
-                if (aux_val < 0) {
-                  rel_dist = 0;
+                if (aux_val < 1) {
+                  rel_dist = 1;  // no 0 distance
                 } else {
                   rel_dist = aux_val;
                 }
@@ -1396,10 +1398,11 @@ void loop() {
           update_confirm_menu();
         }
       }
-
-    // AAA falta
-
+      break;
     case ST_HOMING: 
+      //homing_screen();
+
+
       lcd.clear();
       t_half_ustep = ((unsigned long)array_t_half_ustep[vel_mmh]);     
       // attach function for half micro steps interruption

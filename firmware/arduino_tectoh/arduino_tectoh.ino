@@ -1,3 +1,4 @@
+//#include "config.h"
 
 // Libraries: https://docs.arduino.cc/software/ide-v1/tutorials/installing-libraries
 // https://www.arduino.cc/reference/en/libraries/timerone
@@ -41,6 +42,10 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 #define LCD_NUMROWS 4   // 4 rows
 
 #define LCD_PARAMS_COL 12 // column where the parameters are drawn, the left side 
+
+// column where the additional info of the actual position of the gantry according
+// to the EEPROM
+#define LCD_EEP_POS_COL 11
 
 // Rotary encoder of LCD
 #define ROT_ENC1_PIN 31    // Quadrature rotary encoder signal 1
@@ -854,13 +859,14 @@ void task_menu()
   lcd.setCursor(1, 1);
   lcd.print("Relative move");
 
-  lcd.setCursor(10, 3);
+  lcd.setCursor(LCD_EEP_POS_COL, 3);
   lcd.print("|x:");
   if (pos_x_eeprom == -1) {
     lcd.print("  ?");
   } else {
     lcdprint_rght(pos_x_eeprom,3);
   }
+  lcd.print("mm");
 
   lcd.setCursor(0, 0);
   if (task_st == TASK_HOME) {
@@ -975,7 +981,7 @@ void param_menu ()
   lcd.write(byte(BACK_ARROW));
 
   // aditional info:
-  lcd.setCursor(10, 3);
+  lcd.setCursor(LCD_EEP_POS_COL, 3);
   lcd.print("|x:");
   if (pos_x_eeprom == -1) {
     lcd.print("  ?");
@@ -1104,12 +1110,12 @@ void update_param_menu() {
   }
 
   // uptade previous values
-  ui_state_prev    = ui_state;
-  selparam_st_prev = selparam_st;
-  seldigit_st_prev = seldigit_st;
-  rel_dist_prev    = rel_dist;
-  rel_dist_prev    = rel_dist;  
-  vel_mmh_prev     = vel_mmh;  
+  ui_state_prev     = ui_state;
+  selparam_st_prev  = selparam_st;
+  seldigit_st_prev  = seldigit_st;
+  rel_dist_prev     = rel_dist;
+  rel_dist_neg_prev = rel_dist_neg;
+  vel_mmh_prev      = vel_mmh;
 }
 
 
@@ -1131,7 +1137,7 @@ void confirm_menu ()
   // -- row 1 
   lcd.setCursor(1, 1);
   if (task_st == TASK_HOME) {
-    lcd.print("Go Home:  x = 0 mm");
+    lcd.print("Go Home: x = 0 mm");
   } else {
     lcd.setCursor(0, 1);
     lcd.print("Travel dist.");
@@ -1169,7 +1175,7 @@ void confirm_menu ()
   lcd.write(byte(BACK_ARROW));
 
   // aditional info:
-  lcd.setCursor(10, 3);
+  lcd.setCursor(LCD_EEP_POS_COL, 3);
   lcd.print("|x:");
   if (pos_x_eeprom == -1) {
     lcd.print("  ?");
@@ -1248,6 +1254,7 @@ void loop() {
           } else {
             task_st = TASK_HOME;
           }
+          selparam_st = SELPARAM_VEL; // start selecting speed
           update_task_menu();
         }
       }
@@ -1259,6 +1266,8 @@ void loop() {
           case SELPARAM_VEL:
           case SELPARAM_DIST:
             ui_state = ST_SEL_DIGIT;
+            // when comming from ST_SEL_PARAMS, start with units
+            seldigit_st = SELDIG_UNITS;
             update_param_menu();
             break;
           case SELPARAM_GO:

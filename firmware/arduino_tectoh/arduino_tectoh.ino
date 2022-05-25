@@ -134,7 +134,8 @@ short pos_x_eeprom;
 // to make some operations
 short vel_mmh = MAX_VEL;  // Speed of the Sandbox in mm/h, from 1 to 100
 short abs_dest = -1;  // absolute position of the destination, from x0 in mm
-short rel_dist = 1; // relative position of the destination, from initial position, mm
+short rel_dist = 1; // relative position of the destination, in absolute value
+short rel_dist_sign = 1; // relative position of the destination, including sign
 bool  rel_dist_neg = false;  // sign of rel_dist: 0: positive, 1: negative
 // relative position of the destination, from actual position, it is update when
 // actual position changes
@@ -701,7 +702,6 @@ void init_screen()
 
 // ---------------- run relative screen
 // -- moving a relative distancie
-/*
 void runrel_screen()
 {
   byte row = 0;
@@ -766,7 +766,7 @@ void runrel_screen()
   lcd.setCursor(0, row);
 
          //  01234567
-  lcd.print("dL=-  0");
+  lcd.print("dL=");
   if (rel_dist_neg == false) {
     lcd.print("+");
   } else {
@@ -788,7 +788,6 @@ void runrel_screen()
     digitalWrite(X_DIR_PIN, DIR_MOTOR_NEG); // motor back
   }
 }
-*/
 
 // -------------- runrel  run experiment with relative distance
 // update the runrel variables on the screen
@@ -936,6 +935,8 @@ void homing_screen()
   // endstop print
   lcd.setCursor(19, 3);
   lcdprint_endstops();
+
+  digitalWrite(X_DIR_PIN, DIR_MOTOR_NEG); //homing:  motor back
 }
 
 
@@ -1348,8 +1349,6 @@ void update_task_menu()
   }
   task_st_prev = task_st;
 }
-
-
 
 
 
@@ -1823,6 +1822,11 @@ void loop() {
                 } else {
                   rel_dist = aux_val;
                 }
+                if (rel_dist_neg) {
+                  rel_dist_sign = - rel_dist;
+                } else {
+                  rel_dist_sign = rel_dist;
+                }
               }
               break;
             default: // would be an error to be here
@@ -1864,10 +1868,9 @@ void loop() {
           if (task_st == TASK_HOME) {
             ui_state = ST_HOMING;
             homing_screen();
-            digitalWrite(X_DIR_PIN, DIR_MOTOR_NEG); //homing:  motor back
           } else {
             ui_state = ST_RUN;
-            //runrel_screen();
+            runrel_screen();
           }
           enable_isr(); // enable interrupts for the experiment
         } else {

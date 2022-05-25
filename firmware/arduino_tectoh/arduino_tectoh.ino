@@ -431,9 +431,10 @@ void setup() {
   lcd.createChar(CHR_MM, IC_MM);               // 6: milimiter
   lcd.createChar(CHR_PER_HOUR, IC_PER_HOUR);   // 7: per hour
  
-  digitalWrite(X_ENABLE_PIN , LOW);  // Stepper motor enable. Active-low
+  digitalWrite(X_ENABLE_PIN , HIGH);  // Stepper motor disable. Active-low
   digitalWrite(X_STEP_PIN , LOW);  // dont step at start
 
+  init_screen();
   
 }
 
@@ -791,6 +792,10 @@ void runrel_screen()
   lcd.setCursor(19, 3);
   lcdprint_endstops();
 
+  // init the displacement
+  relat_pos_mm_stp = 0; // calculated from halfsteps
+  relat_pos_mm_lin = 0; // calculated from lines
+
   if (rel_dist_neg == false) {
     digitalWrite(X_DIR_PIN, DIR_MOTOR_POS); 
   } else {
@@ -1035,12 +1040,11 @@ void save2eeprom()
 
   EEPROM.put(EEP_DIR_VALID, eeprom_valid);
   EEPROM.put(EEP_DIR_POS_X, abs_dest);
-  EEPROM.get(EEP_DIR_DIST,  rel_dist);
-  EEPROM.get(EEP_DIR_VEL,   vel_mmh);
-  EEPROM.get(EEP_DIR_SECS,  sec_cnt);
-  EEPROM.get(EEP_DIR_MINS,  minute_cnt);
-  EEPROM.get(EEP_DIR_HOURS, hour_cnt);
-
+  EEPROM.put(EEP_DIR_DIST,  rel_dist);
+  EEPROM.put(EEP_DIR_VEL,   vel_mmh);
+  EEPROM.put(EEP_DIR_SECS,  sec_cnt);
+  EEPROM.put(EEP_DIR_MINS,  minute_cnt);
+  EEPROM.put(EEP_DIR_HOURS, hour_cnt);
 
 }
 
@@ -1628,7 +1632,6 @@ void loop() {
 
   switch (ui_state){
     case ST_INI:
-      init_screen();
       rot_enc_pushed = rot_encoder_pushed();
       if (rot_enc_pushed == true) { 
         // get the EEPROM value (only once)
@@ -1777,6 +1780,7 @@ void loop() {
             ui_state = ST_RUN;
             runrel_screen();
           }
+          digitalWrite(X_ENABLE_PIN , LOW);  // Stepper motor enable. Active-low
           enable_isr(); // enable interrupts for the experiment
         } else {
           ui_state = ST_SEL_PARAMS;
@@ -1797,12 +1801,22 @@ void loop() {
       break;
     case ST_HOMING: 
       homing();
+      ui_state = ST_END;
       break;
 
     case ST_RUN: 
       running_rel();
+      ui_state = ST_END;
       break;    
     case ST_END:
+      digitalWrite(X_ENABLE_PIN , HIGH); // Stepper motor disable. Active-low
+      rot_enc_pushed = rot_encoder_pushed();
+        if (rot_enc_pushed == true) { // confirmation or go back
+          ui_state = ST_INI;
+          lcd.createChar(CHR_HL_DIAM, IC_HL_DIAM); // 0: hollow diamond
+          lcd.createChar(CHR_FL_DIAM, IC_FL_DIAM); // 1: full diamond
+          lcd.clear();
+        }
       break;
   }
   

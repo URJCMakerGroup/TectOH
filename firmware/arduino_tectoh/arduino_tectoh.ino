@@ -161,8 +161,13 @@ float relat_pos_mm_lin = 0; // calculated from lines
 // For  3mm lead, 400 halfsteps per turn and 51 reduction, the fastest
 // speeds, from 83mm/h and up, the h_ustp take less than 200 us
 // for speed from 1mm/h to 82 mm/h, the h_microstp take 200 us
+// This vector should be integer, because we are not usign decimals AAAAA
 
 const float vec_t_h_ustp[] = {0,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,200,199.33,196.95,194.64,192.37,190.16,188.00,185.89,183.82,181.80,179.83,177.89,176.00,174.15,172.33,170.56,168.82,167.11,165.44};
+
+// it is byte because is less than 200
+byte t_half_ustp; // time that a half microstep takes, from the previous vector
+const byte SLEW_VEL_T_USTP = 200; // microseconds lower than the speed will be continuos
 
 // array for the time of a half step (h_stp), it is only used when the time
 // a half microstep (h_ustp) is lower than 200. Otherwise, they would be out
@@ -693,6 +698,180 @@ void init_screen()
   
 }
 
+
+// ---------------- run relative screen
+// -- moving a relative distancie
+/*
+void runrel_screen()
+{
+  byte row = 0;
+
+  lcd.createChar(CHR_X0, IC_X0); //
+  lcd.createChar(CHR_XF, IC_XF); //
+
+  lcd.clear();
+  // -- row 0 
+  row = 0;
+  lcd.setCursor(0, row);
+           //1234567890123456789
+  lcd.print("RUNREL");
+  lcd.write(CHR_XF);
+  lcd.print("=");
+  if (pos_x_eeprom == -1) {
+    lcd.print("  ?");
+  } else {
+    abs_dest = pos_x_eeprom + rel_dist_sign;
+    lcdprint_rght(abs_dest,3);
+  }
+  lcd.write(CHR_MM);
+
+  lcd.print("|");
+  lcd.write(byte(CHR_X0));
+  lcd.print("=");
+  if (pos_x_eeprom == -1) {
+    lcd.print("  ?");
+  } else {
+    lcdprint_rght(pos_x_eeprom,3);
+  }
+  lcd.write(CHR_MM);
+
+  // -- row 1 
+  row = 1;
+  lcd.setCursor(0, row);
+  lcd.print("v=");
+  lcdprint_rght(vel_mmh,3);
+  lcd.write(CHR_MM);
+  lcd.write(CHR_PER_HOUR);
+
+           //7890123456789
+  lcd.print(" |00h 00m 00s");
+
+  // -- row 2 steps
+  row = 2;
+  lcd.setCursor(0, row);
+         //  0123456
+  lcd.print("dS=");
+  if (rel_dist_neg == false) {
+    lcd.print("+");
+  } else {
+    lcd.print("-");
+  }
+  lcd.print("  0");
+  lcd.write(CHR_MM);
+           //8901
+  lcd.print("|hs=");
+
+  // -- row 3 lines
+  row = 3;
+  lcd.setCursor(0, row);
+
+         //  01234567
+  lcd.print("dL=-  0");
+  if (rel_dist_neg == false) {
+    lcd.print("+");
+  } else {
+    lcd.print("-");
+  }
+  lcd.print("  0");
+  lcd.write(CHR_MM);
+
+  lcd.print("|lin=    0");
+
+
+  // endstop print
+  lcd.setCursor(19, 3);
+  lcdprint_endstops();
+
+  if (rel_dist_neg == false) {
+    digitalWrite(X_DIR_PIN, DIR_MOTOR_POS); 
+  } else {
+    digitalWrite(X_DIR_PIN, DIR_MOTOR_NEG); // motor back
+  }
+}
+*/
+
+// -------------- runrel  run experiment with relative distance
+// update the runrel variables on the screen
+// this function stays in a loop until the distance is traversed,
+// or any of the endstops are active
+/*
+void runrel() {
+
+  // no need to use global vars o static, we remain in this function
+
+  // local copies to work with them
+  unsigned long hstp_cnt_copy;
+  short         lps_line_cnt_copy;
+  short         hour_cnt_copy;
+  // for seconds minutes is not necessary because they are byte
+
+  // to compare
+  unsigned long hstp_cnt_prev     = 0;
+  short         lps_line_cnt_prev = 0;
+  byte          sec_cnt_prev      = 0;
+  byte          minute_cnt_prev   = 0;
+  short         hour_cnt_prev     = 0;
+
+  while ((relat_pos_mm_stp == rel_dist) ||
+         (relat_pos_mm_stp > 1 && (  // stop if any endstop is high, after starting, it can be made better
+          endstop_x_ini == ENDSTOP_OFF
+          endstop_x_end == ENDSTOP_OFF))) {
+
+    // disable interrupts to make a copy to avoid corruption
+    // for seconds minutes is not necessary because they are byte
+    noInterrupts();
+    hstp_cnt_copy     = hstp_cnt;
+    lps_line_cnt_copy = lps_line_cnt;
+    hour_cnt_copy     = hour_cnt;
+    interrupts();
+
+    if (hstp_cnt_copy != hstp_cnt_prev) {
+      lcd.setCursor(4, 2);
+      relat_pos_mm_stp = ADVAN_HSTEP * hstp_cnt_copy;
+      lcdprint_rght(int(relat_pos_mm_stp),3);
+      lcd.setCursor(12, 2);
+      lcd.print(hstp_cnt_copy);
+      hstp_cnt_prev = hstp_cnt_copy;
+    }
+
+    if (lps_line_cnt_copy != lps_line_cnt_prev) {
+      lcd.setCursor(4, 3);
+      relat_pos_mm_lin = mm_per_lps_line * lps_line_cnt_copy;
+      lcdprint_rght(int(relat_pos_mm_lin),3);
+      lcd.setCursor(12, 3);
+      lcd.print(lps_line_cnt_copy);
+      lps_line_cnt_prev = lps_line_cnt_copy;
+    }
+    
+    if (sec_cnt != sec_cnt_prev) {
+      if (minute_cnt != minute_cnt_prev) {
+        if (hour_cnt_copy != hour_cnt_prev) {
+          lcd.setCursor(9, 1);
+          lcdprint_rght(hour_cnt_copy,2);
+          hour_cnt_prev = hour_cnt_copy;
+        }
+        lcd.setCursor(13, 1);
+        lcdprint_rght(minute_cnt,2);
+        minute_cnt_prev = minute_cnt;
+      }
+      lcd.setCursor(17, 1);
+      lcdprint_rght(sec_cnt,2);
+      sec_cnt_prev = sec_cnt;
+    }
+
+    // endstop print, it reads the enstops, for the while
+    lcd.setCursor(19, 3);
+    lcdprint_endstops();
+  }
+
+  // deactivate interrupts
+  // save values in EEPROM
+  // HOMED state
+}
+
+
+*/
+
 // ---------------- homing screen
 
 void homing_screen()
@@ -748,7 +927,7 @@ void homing_screen()
   lcd.setCursor(0, row);
 
          //  01234567
-  lcd.print("dL=-  0");
+  lcd.print("dL=   0");
   lcd.write(CHR_MM);
 
   lcd.print("|lin=    0");
@@ -831,6 +1010,7 @@ void homing() {
   }
 
   // deactivate interrupts
+  disable_isr();
   // save values in EEPROM
   // HOMED state
 }
@@ -1478,15 +1658,30 @@ void update_confirm_menu ()
 
 }
 
+// ---------------- disable interrupts
+// when finishing the experiment
+
+void disable_isr()
+{
+  byte t_half_ustp; // time that a half microstep takes
+  unsigned long t_half_stp; // time that a half of a step takes
+
+  Timer1.detachInterrupt(); // microstep interrupt
+  if (t_half_ustp == 200) { // slow speed
+    Timer4.detachInterrupt(); // there has no interrupt for halfsteps
+  }
+  // interrupt for the linear position sensor
+  detachInterrupt(digitalPinToInterrupt(LPS_ENC1_PIN));
+  Timer3.detachInterrupt(); // Second counter
+}
+
 
 // ---------------- enable interrupts
 // when starting the experiment
 
 void enable_isr()
 {
-  // it is byte because is less than 200
-  byte t_half_ustp; // time that a half microstep takes
-  unsigned long t_half_stp; // time that a half of a step takes
+  unsigned long t_half_stp = 0; // time that a half of a step takes
 
   t_half_ustp = ((byte)vec_t_h_ustp[vel_mmh]);
 
@@ -1672,6 +1867,7 @@ void loop() {
             digitalWrite(X_DIR_PIN, DIR_MOTOR_NEG); //homing:  motor back
           } else {
             ui_state = ST_RUN;
+            //runrel_screen();
           }
           enable_isr(); // enable interrupts for the experiment
         } else {

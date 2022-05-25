@@ -789,12 +789,12 @@ void runrel_screen()
   }
 }
 
-// -------------- runrel  run experiment with relative distance
+// -------------- running_rel  run experiment with relative distance
 // update the runrel variables on the screen
 // this function stays in a loop until the distance is traversed,
 // or any of the endstops are active
-/*
-void runrel() {
+
+void running_rel() {
 
   // no need to use global vars o static, we remain in this function
 
@@ -811,10 +811,10 @@ void runrel() {
   byte          minute_cnt_prev   = 0;
   short         hour_cnt_prev     = 0;
 
-  while ((relat_pos_mm_stp == rel_dist) ||
-         (relat_pos_mm_stp > 1 && (  // stop if any endstop is high, after starting, it can be made better
-          endstop_x_ini == ENDSTOP_OFF
-          endstop_x_end == ENDSTOP_OFF))) {
+  while ((relat_pos_mm_stp != rel_dist) &&
+        !(relat_pos_mm_stp > 1 && (  // stop if any endstop is high, after starting, it can be made better
+          endstop_x_ini == ENDSTOP_ON ||
+          endstop_x_end == ENDSTOP_ON))) {
 
     // disable interrupts to make a copy to avoid corruption
     // for seconds minutes is not necessary because they are byte
@@ -864,12 +864,13 @@ void runrel() {
   }
 
   // deactivate interrupts
+  disable_isr();
   // save values in EEPROM
   // HOMED state
 }
 
 
-*/
+
 
 // ---------------- homing screen
 
@@ -1895,7 +1896,7 @@ void loop() {
       break;
 
     case ST_RUN: 
-      
+      running_rel();
       break;    
     case ST_END:
       break;

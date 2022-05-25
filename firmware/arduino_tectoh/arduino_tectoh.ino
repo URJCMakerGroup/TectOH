@@ -127,7 +127,15 @@ volatile byte sec_cnt = 0; // Keep track of the number of seconds of the experim
 // position of the gantry in mm, according to the value saved in the EEPROM
 short pos_x_eeprom;
 
-#define EEPROM_DIR 0  // memory address of the EEPROM where the gantry position is
+//#define EEPROM_DIR 0  // memory address of the EEPROM where the gantry position is
+
+byte  eeprom_valid_read = 0;  // 0
+short pos_x_eep_read    =-1;  // 1,2
+short dist_eep_read     =-1;  // 3,4
+short vel_eep_read      =-1;  // 5,6
+byte  secs_eep_read;          // 7
+byte  mins_eep_read;          // 8
+short hours_eep_read    = -1; // 9,10
 
 // short are 16bits
 // Speed of the Sandbox in mm/h, from 1 to 100, making it short, to have negative
@@ -717,10 +725,11 @@ void runrel_screen()
   lcd.print("RUNREL");
   lcd.write(CHR_XF);
   lcd.print("=");
-  if (pos_x_eeprom == -1) {
+  if (pos_x_eep_read == -1) {
     lcd.print("  ?");
+    abs_dest = -1;
   } else {
-    abs_dest = pos_x_eeprom + rel_dist_sign;
+    abs_dest = pos_x_eep_read + rel_dist_sign;
     lcdprint_rght(abs_dest,3);
   }
   lcd.write(CHR_MM);
@@ -728,10 +737,10 @@ void runrel_screen()
   lcd.print("|");
   lcd.write(byte(CHR_X0));
   lcd.print("=");
-  if (pos_x_eeprom == -1) {
+  if (pos_x_eep_read == -1) {
     lcd.print("  ?");
   } else {
-    lcdprint_rght(pos_x_eeprom,3);
+    lcdprint_rght(pos_x_eep_read,3);
   }
   lcd.write(CHR_MM);
 
@@ -811,7 +820,7 @@ void running_rel() {
   byte          minute_cnt_prev   = 0;
   short         hour_cnt_prev     = 0;
 
-  while ((relat_pos_mm_stp != rel_dist) &&
+  while ((relat_pos_mm_stp <= rel_dist) &&
         !(relat_pos_mm_stp > 1 && (  // stop if any endstop is high, after starting, it can be made better
           endstop_x_ini == ENDSTOP_ON ||
           endstop_x_end == ENDSTOP_ON))) {
@@ -881,6 +890,8 @@ void homing_screen()
   lcd.createChar(CHR_X0, IC_X0); //
   lcd.createChar(CHR_XF, IC_XF); //
 
+  abs_dest = 0;  // destination is 0
+
   lcd.clear();
   // -- row 0 
   row = 0;
@@ -895,10 +906,10 @@ void homing_screen()
   lcd.print("|");
   lcd.write(byte(CHR_X0));
   lcd.print("=");
-  if (pos_x_eeprom == -1) {
+  if (pos_x_eep_read == -1) {
     lcd.print("  ?");
   } else {
-    lcdprint_rght(pos_x_eeprom,3);
+    lcdprint_rght(pos_x_eep_read,3);
   }
   lcd.write(CHR_MM);
 
@@ -1013,137 +1024,24 @@ void homing() {
 
   // deactivate interrupts
   disable_isr();
+  save2eeprom();
   // save values in EEPROM
   // HOMED state
 }
 
+void save2eeprom()
+{
+  byte eeprom_valid = 1;
 
-//////////////// ESTADO 3 ////////////////
+  EEPROM.put(EEP_DIR_VALID, eeprom_valid);
+  EEPROM.put(EEP_DIR_POS_X, abs_dest);
+  EEPROM.get(EEP_DIR_DIST,  rel_dist);
+  EEPROM.get(EEP_DIR_VEL,   vel_mmh);
+  EEPROM.get(EEP_DIR_SECS,  sec_cnt);
+  EEPROM.get(EEP_DIR_MINS,  minute_cnt);
+  EEPROM.get(EEP_DIR_HOURS, hour_cnt);
 
-void experimento() {
 
-  byte endstop_x_ini;    // endstop value at x=0
-  byte endstop_x_end;    // endstop value at the end
-
-  endstop_x_ini = digitalRead(X_MIN_PIN);
-  endstop_x_end = digitalRead(X_MAX_PIN);
-  
-  if (endstop_x_ini == ENDSTOP_ON ) {
-    exp_homed = 1;
-  }
-
-  if (endstop_x_end == HIGH ) {
-    fin = 1;
-  }
-
-  /*
-  if (exp_homed == true) {
-    if (pos_x_ini == 0) {
-      exp_pass_init = true;
-    }
-    else if (pos_x_ini == (ADVAN_HSTEP * tot_halfstep_cnt)) {
-      exp_pass_init = true;
-    }
-  }  
-
-// MOVIMIENTO MOTOR
-
-  if (exp_homed == true && fin == 0) {  
-    digitalWrite(X_DIR_PIN , HIGH);
-  }
-  else { 
-    digitalWrite(X_DIR_PIN , LOW);
-  }   
-
-// POSITION
-
-  if (exp_pass_init == true) {
-    
-    lcd.setCursor(0, 0);
-    lcd.print("LINES: ");
-
-    lcd.setCursor(7, 0);
-    lcd.print(lps_line_cnt);
-
-    // millimeters observed by linear position sensor
-    lps_mm = mm_per_lps_line*lps_line_cnt;
-    
-    lcd.setCursor(11, 0);
-    lcd.print("->"); 
-    lcd.setCursor(14, 0);
-    lcd.print(lps_mm);
-    lcd.setCursor(18, 0);
-    lcd.print("mm"); 
-     
-    if (lps_line_cnt <10 && lps_line_cnt >=0){
-      lcd.setCursor(8, 0);
-      lcd.print(" ");
-    }
-    if (lps_line_cnt <100 && lps_line_cnt >=0){
-      lcd.setCursor(9, 0);
-      lcd.print(" ");
-    }
-    if (lps_line_cnt <1000 && lps_line_cnt >=0){
-      lcd.setCursor(10, 0);
-      lcd.print(" ");
-    }
-    
-    lcd.setCursor(0, 2);
-    lcd.print("Halfsteps: ");
-    lcd.setCursor(12, 2);    
-    lcd.print(tot_halfstep_cnt);
-
-    absol_pos_mm = (ADVAN_HSTEP * tot_halfstep_cnt);   // each halfstep
-    relat_pos_mm = (ADVAN_HSTEP * hstp_cnt);
-
-    lcd.setCursor(0, 3);
-    lcd.print("Avance: ");
-    lcd.setCursor(7, 3);
-    
-    if (pos_x_ini == 0){     
-      lcd.print(absol_pos_mm);
-    } else {
-      lcd.print(relat_pos_mm);
-    }
-    
-    lcd.setCursor(11, 3);
-    lcd.print("mm");
-      
-  }
-  
-// TIEMPO 
-  
-  if (exp_homed == false && fin == 0) {
-    lcd.setCursor(0, 0);
-    lcd.write(CHR_RGHT_ARROW);
-    lcd.print("HOME");
-  } else if (exp_pass_init == true && fin ==0 && (absol_pos_mm < pos_x_end)){  
-      if (sec_cnt == 60)  {
-        sec_cnt = 0;
-        minute_cnt ++;
-      }
-      if (minute_cnt == 60) {
-        minute_cnt = 0;
-        hour_cnt ++;
-      }
-      lcd.setCursor(0, 1);
-      if (hour_cnt < 10) {
-        lcd.print("0");
-      }
-      lcd.print(hour_cnt);
-      lcd.print(":");
-      lcd.setCursor(3, 1);
-      if (minute_cnt < 10) {
-        lcd.print("0");
-      }
-      lcd.print(minute_cnt);
-      lcd.print(":");
-      lcd.setCursor(6, 1);
-      if (sec_cnt < 10) {
-        lcd.print("0");
-      }
-      lcd.print(sec_cnt);
-    }*/
 }
 
 
@@ -1266,22 +1164,28 @@ void check_pos_x_eeprom()
 {
   endstop_x_ini = digitalRead(X_MIN_PIN);
   endstop_x_end = digitalRead(X_MAX_PIN);
- 
+
+  EEPROM.get(EEP_DIR_VALID, eeprom_valid_read);
+
+  if (eeprom_valid_read == 1) {
+    EEPROM.get(EEP_DIR_POS_X, pos_x_eep_read);
+    EEPROM.get(EEP_DIR_DIST,  dist_eep_read);
+    EEPROM.get(EEP_DIR_VEL,   vel_eep_read);
+    EEPROM.get(EEP_DIR_SECS,  secs_eep_read);
+    EEPROM.get(EEP_DIR_MINS,  mins_eep_read);
+    EEPROM.get(EEP_DIR_HOURS, hours_eep_read);
+  } else {
+    pos_x_eep_read = -1;  
+  }
+  /*
   if (endstop_x_ini == ENDSTOP_ON) {
     pos_x_eeprom = 0;
     EEPROM.put(EEPROM_DIR, pos_x_eeprom);
   } else if (endstop_x_end == ENDSTOP_ON) {
     pos_x_eeprom = TOT_LEN; // AAA: this value has to be calculated
     EEPROM.put(EEPROM_DIR, pos_x_eeprom);
-  } else { // not at the end or init
-    // get the value from the EEPROM
-    EEPROM.get(EEPROM_DIR, pos_x_eeprom);
-    if (pos_x_eeprom > 0 && pos_x_eeprom < TOT_LEN) {
-      // position ok
-    } else { // position not valid
-      pos_x_eeprom = -1;
-    }
   }
+  */
 }
 
 
@@ -1301,10 +1205,10 @@ void task_menu()
 
   lcd.setCursor(LCD_EEP_POS_COL, 3);
   lcd.print("|x:");
-  if (pos_x_eeprom == -1) {
+  if (pos_x_eep_read == -1) {
     lcd.print("  ?");
   } else {
-    lcdprint_rght(pos_x_eeprom,3);
+    lcdprint_rght(pos_x_eep_read,3);
   }
   lcd.write(CHR_MM);
 
@@ -1423,10 +1327,10 @@ void param_menu ()
   // aditional info:
   lcd.setCursor(LCD_EEP_POS_COL, 3);
   lcd.print("|x:");
-  if (pos_x_eeprom == -1) {
+  if (pos_x_eep_read == -1) {
     lcd.print("  ?");
   } else {
-    lcdprint_rght(pos_x_eeprom,3);
+    lcdprint_rght(pos_x_eep_read,3);
   }
   lcd.write(CHR_MM);
 
@@ -1617,10 +1521,10 @@ void confirm_menu ()
   // aditional info:
   lcd.setCursor(LCD_EEP_POS_COL, 3);
   lcd.print("|x:");
-  if (pos_x_eeprom == -1) {
+  if (pos_x_eep_read == -1) {
     lcd.print("  ?");
   } else {
-    lcdprint_rght(pos_x_eeprom,3);
+    lcdprint_rght(pos_x_eep_read,3);
   }
   lcd.write(CHR_MM);
 

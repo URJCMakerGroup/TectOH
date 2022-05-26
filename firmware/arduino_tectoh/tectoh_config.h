@@ -9,8 +9,10 @@
 // If the following is true, a HIGH in this pin will make the gantry
 // move in positive direction, from x0 to xend.
 
-#define DIR_MOTOR_POS_HIGH true // Set to false to invert the logic of the motor direction
+#define DIR_MOTOR_POSIT_HIGH true // Set to false to invert the logic of the motor direction
 
+// enable of motor are usually active low.
+#define ENABLE_MOTOR_LOW true  // Set to false to make enable with a HIGH
 
 // ----------------- EEPROM Directions
 

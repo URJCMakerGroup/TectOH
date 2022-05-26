@@ -12,8 +12,26 @@
 #define DIR_MOTOR_POS_HIGH true // Set to false to invert the logic of the motor direction
 
 
-// -----------------------------------------
+// ----------------- EEPROM Directions
 
+// -1 Not valid, 1 Valid, 0 unknown
+#define EEP_DIR_VALID 0
+
+// X position in mm: 0 to 400, short. 2 bytes
+#define EEP_DIR_POS_X 1
+
+// Last experiment values
+// Distance last experiment. 2 bytes
+#define EEP_DIR_DIST  3
+
+// Speed last experiment. short. 2 bytes
+// could be just 1 byte, but in case we get larger speeds
+#define EEP_DIR_VEL   5
+
+// Time last experiment. 1 byte
+#define EEP_DIR_SECS  7
+#define EEP_DIR_MINS  8 // 1 byte
+#define EEP_DIR_HOURS 9 // 2 bytes
 
 
 

@@ -141,7 +141,7 @@ volatile byte sec_cnt = 0; // Keep track of the number of seconds of the experim
 #define EEP_AD_VALID 0
 
 // Actual position in mm: 0 to 400, short. 2 bytes
-#define EEP_AD_POS_ACT 1
+#define EEP_AD_POS_ACT 24
 
 // Last experiment values
 // Distance last experiment. 2 bytes
@@ -189,7 +189,7 @@ volatile byte sec_cnt = 0; // Keep track of the number of seconds of the experim
 #define EEP_INVALID_DATA 0 //data from EEPROM is not valid
 #define EEP_ESTOP_ERR    2 //postion and endstop info doesnt match
 
-byte  eeprom_valid_read = EEP_VALID_DATA;  // 0
+byte  eeprom_valid_read = EEP_INVALID_DATA;  // 0
 short pos_act_eep_read  =  0;  // 1,2
 short dist_eep_read     =  0;  // 3,4
 short pos_prev_eep_read =  0;  // 5,6
@@ -209,14 +209,11 @@ byte estop_end_eep_read = 0; //23
 // Speed of the Sandbox in mm/h, from 1 to 100, making it short, to have negative
 // to make some operations
 short vel_mmh = MAX_VEL;  // Speed of the Sandbox in mm/h, from 1 to 100
-short pos_dest = -1;  // absolute position of the destination, from x0 in mm
+short pos_dest = 0;  // absolute position of the destination, from x0 in mm
 //experiment's distance to the destination in mm, Magnitude (no sign)
 short dist_dest_magn = 1; //experiment's distance to the destination in mm, no sign 
 short dist_dest_wsign = 1; // relative position of the destination, with sign
 bool  is_dist_dest_neg = false;  //sign of dist_dest_magn: false: positive, true: negative
-// relative position of the destination, from actual position, it is update when
-// actual position changes
-short rel_dest_updated = 0;
 
 volatile byte h_ustp_cnt = 0;    // Number of half usteps in a halfstep 0 to 31
 
@@ -227,7 +224,6 @@ volatile byte h_ustp_cnt = 0;    // Number of half usteps in a halfstep 0 to 31
 //               2,714,666.67 halfsteps (22 bits) So we can count them
 volatile unsigned long hstp_cnt = 0;   // Number of half steps, from initial position
 
-float pos_mm = 0; // position from the gantry in mm, absolute position
 // traveled distance in the experiment
 // Calculated from steps
 float traveled_mm_hs_f = 0; // float version calculated from halfsteps
@@ -669,9 +665,9 @@ short calc_incr(byte seldigit_st_arg, bool right, bool left)
 // prints the error code of the error from the eeprom,
 // short_print is true, only 3 chars will be printed
 
-void lcdprint_errcode(byte eeprom_valid_read)
+void lcdprint_errcode(byte eeprom_valid_read_arg)
 {
-  switch (eeprom_valid_read) {
+  switch (eeprom_valid_read_arg) {
     case EEP_VALID_DATA:
       lcd.print(" VALID  ");
       break;
@@ -688,11 +684,11 @@ void lcdprint_errcode(byte eeprom_valid_read)
 // prints the value or the error code
 // short_print is true, only 3 chars will be printed
 
-void lcdprint_val_err(int number, byte eeprom_valid_read, int max_digit)
+void lcdprint_val_err(int number, byte eeprom_valid_read_arg, int max_digit)
 {
   int index = 0;
 
-  switch (eeprom_valid_read) {
+  switch (eeprom_valid_read_arg) {
     case EEP_VALID_DATA:
       lcdprint_rght(number, max_digit);
       break;
@@ -973,25 +969,28 @@ void run_dist_screen()
   lcd.createChar(CHR_X0, IC_X0); //
   lcd.createChar(CHR_XF, IC_XF); //
 
+  if (eeprom_valid_read  == EEP_VALID_DATA) {
+    pos_dest = pos_act_eep_read + dist_dest_wsign; 
+  }
+
   lcd.clear();
   // -- row 0 
   row = 0;
   lcd.setCursor(0, row);
            //1234567890123456789
-  lcd.print("RUNDIS");
+  lcd.print("D:");
+  lcdprint_rght_sign(dist_dest_wsign,3);
+
+  lcd.print(" ");
   lcd.write(CHR_XF);
   lcd.print("=");
   lcdprint_val_err(pos_dest, eeprom_valid_read, 3);
   lcd.write(CHR_MM);
 
-  lcd.print("|");
+  lcd.print(" ");
   lcd.write(byte(CHR_X0));
   lcd.print("=");
-  if (eeprom_valid_read == EEP_INVALID_DATA) {
-    lcd.print("  ?");
-  } else {
-    lcdprint_rght(pos_act_eep_read,3);
-  }
+  lcdprint_val_err(pos_act_eep_read, eeprom_valid_read, 3);
   lcd.write(CHR_MM);
 
   // -- row 1 
@@ -1052,7 +1051,7 @@ void run_dist_screen()
   } else {
     digitalWrite(X_DIR_PIN, DIR_MOTOR_POS); 
   }
-}
+} //run_dist_screen
 
 // -------------- run_distance  run experiment with relative distance
 // update the run_dist variables on the screen
@@ -1134,7 +1133,6 @@ void run_distance() {
   // deactivate interrupts
   disable_isr();
   save2eeprom();
-  // HOMED state
 } // run_distance()
 
 
@@ -1426,6 +1424,22 @@ void save2eeprom()
 
   EEPROM.put(EEP_AD_VALID,   EEP_VALID_DATA); // all the data has ben saved
 
+  // --- now that all the data has been saved, put it to their initial values
+
+  //pos_dest = 0;
+  dist_dest_magn = 1;
+  dist_dest_wsign = 1;
+  is_dist_dest_neg = false;
+
+  hstp_cnt  = 0;
+  h_ustp_cnt = 0;
+
+  traveled_mm_hs = 0;
+  traveled_mm_lin = 0;
+
+  sec_cnt = 0;
+  minute_cnt = 0;
+  hour_cnt = 0;
 } //save2eeprom
 
 
@@ -1460,13 +1474,13 @@ void check_eeprom()
     // if the bit given by EEP_MASK_ESTOP_INI  is 1,
     // result 1, if it is 0, result 0
     estop_ini_eep_read = (estop_eep_read & EEP_MASK_ESTOP_INI);
-    estop_ini_eep_read = estop_ini_eep_read >> (EEP_MASK_ESTOP_INI-1);
+    estop_ini_eep_read = estop_ini_eep_read >> EEP_BIT_ESTOP_INI;
     // this las sentence is equivalent to:
     // estop_ini_eep_read = min(estop_ini_eep_read, 1);
 
     // if the bit 1 is 1, result 1, if it is 0, result 0
     estop_end_eep_read = (estop_eep_read & EEP_MASK_ESTOP_END);
-    estop_end_eep_read = estop_end_eep_read >> (EEP_MASK_ESTOP_END-1);
+    estop_end_eep_read = estop_end_eep_read >> EEP_BIT_ESTOP_END;
     // this las sentence is equivalent to:
     // estop_end_eep_read = min(estop_end_eep_read, 1);
 
@@ -1497,7 +1511,7 @@ void task_menu()
   lcd.print("Move distance");
 
   lcd.setCursor(1, 2);
-  lcd.print("Info last experiment");
+  lcd.print("Info last experimen");
 
   lcd.setCursor(LCD_EEP_POS_COL, 3);
   lcd.print("|x:");
@@ -1533,7 +1547,6 @@ void task_menu()
 
 void update_task_menu()
 {
-
   static byte task_st_prev = TASK_HOME;
 
   if (task_st_prev != task_st) {
@@ -1934,9 +1947,8 @@ void last_info_menu()
 
 void disable_isr()
 {
-  byte t_half_ustp; // time that a half microstep takes
-  unsigned long t_half_stp; // time that a half of a step takes
 
+  t_half_ustp; // time that a half microstep takes
   digitalWrite(X_ENABLE_PIN , DISABLE_MOTOR);
   Timer1.detachInterrupt(); // microstep interrupt
   if (t_half_ustp == SLEW_VEL_T_H_USTP) { // slow speed
@@ -2026,7 +2038,6 @@ void loop() {
       } else {
         read_rot_encoder_dir();
         task_st = nxt_task(task_st, rot_enc_rght, rot_enc_left);
-
         update_task_menu();
       }
       break;
@@ -2174,7 +2185,6 @@ void loop() {
       homing();
       ui_state = ST_END;
       break;
-
     case ST_RUN: 
       run_distance();
       ui_state = ST_END;
@@ -2185,6 +2195,7 @@ void loop() {
         ui_state = ST_SEL_TASK;
         task_menu();
       }
+      break;
     case ST_END:
       rot_enc_pushed = rot_encoder_pushed();
       if (rot_enc_pushed == true) { // confirmation or go back

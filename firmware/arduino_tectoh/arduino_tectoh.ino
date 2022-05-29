@@ -59,8 +59,8 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 #define LCD_STOP_PIN 41
 
 // ----------- Endstops 
-#define X_MIN_PIN 3         // INIT endstop x=0 (HIGH when pressed)
-#define X_MAX_PIN 2         // END endstop (HIGH when pressed)
+#define ESTOP_INI_PIN 3         // INIT endstop x=0 (HIGH when pressed)
+#define ESTOP_END_PIN 2         // END endstop (HIGH when pressed)
 
 
 // ------------ Stepper motor
@@ -69,12 +69,20 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 #define X_ENABLE_PIN 38     // ENABLE pin for the first stepper motor driver (axis X)
 
 // defined in configuration file: tectoh_config.h
-#if DIR_MOTOR_POS_HIGH
+#if DIR_MOTOR_POSIT_HIGH
   #define DIR_MOTOR_POS HIGH
   #define DIR_MOTOR_NEG LOW
 #else
   #define DIR_MOTOR_POS LOW
   #define DIR_MOTOR_NEG HIGH
+#endif
+
+#if ENABLE_MOTOR_LOW
+  #define ENABLE_MOTOR  LOW
+  #define DISABLE_MOTOR HIGH
+#else
+  #define ENABLE_MOTOR  HIGH
+  #define DISABLE_MOTOR LOW
 #endif
 
 
@@ -87,19 +95,18 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 // in 400 mm there are about 2362 lines, so a int, or a short is enough
 volatile short lps_line_cnt = 0;    // number of counted lines of the linear position sensor
 const float mm_per_lps_line = 0.1693; // milimiters per line from linear pos sensor
-float lps_mm = 0;    // milimeters count by the linear position sensor (lps)
 
 // --- endstop values
-byte endstop_x_ini;    // endstop value at x=0
-byte endstop_x_end;    // endstop value at the end
+byte estop_ini;    // endstop value at x=0
+byte estop_end;    // endstop value at the end
 
 // defined in configuration file: tectoh_config.h
-#if ENDSTOP_ACTIVE_HIGH
-  #define ENDSTOP_ON  HIGH
-  #define ENDSTOP_OFF LOW
+#if ESTOP_ACTIVE_HIGH
+  #define ESTOP_ON  HIGH
+  #define ESTOP_OFF LOW
 #else
-  #define ENDSTOP_ON  LOW
-  #define ENDSTOP_OFF HIGH
+  #define ESTOP_ON  LOW
+  #define ESTOP_OFF HIGH
 #endif
 
 const int TOT_LEN = 400;    // leadscrew length in mm, maximum distance
@@ -111,8 +118,9 @@ const int HSTEP_REV = 2 * STEP_REV; // halfsteps per revolution
 
 const float GEAR_R = 51.0f; // gear ratio of the motor
 
-//advance in mm per halfstep
-const float ADVAN_HSTEP = float(LEAD) / (HSTEP_REV * GEAR_R);
+//advance in mm per halfstep  3 / (400 * 51) = 0.000 147
+//const float ADVAN_HSTEP = float(LEAD) / (HSTEP_REV * GEAR_R);
+const float ADVAN_HSTEP = 0.000147;
 
 // ---- variables for keeping track the experiment timing
 
@@ -124,32 +132,89 @@ volatile byte sec_cnt = 0; // Keep track of the number of seconds of the experim
 
 // ----- Sandbox parameters
 
-// position of the gantry in mm, according to the value saved in the EEPROM
-short pos_x_eeprom;
+// EEPROM DATA
 
 //#define EEPROM_DIR 0  // memory address of the EEPROM where the gantry position is
 
-byte  eeprom_valid_read = 0;  // 0
-short pos_x_eep_read    =-1;  // 1,2
-short dist_eep_read     =-1;  // 3,4
-short vel_eep_read      =-1;  // 5,6
-byte  secs_eep_read;          // 7
-byte  mins_eep_read;          // 8
-short hours_eep_read    = -1; // 9,10
+// ----------------- EEPROM addresses 
+
+// 1 Valid, 0 not valid (defined by EEP_VALID_DATA, EEP_INVALID_DATA)
+#define EEP_AD_VALID 0
+
+// Actual position in mm: 0 to 400, short. 2 bytes
+#define EEP_AD_POS_ACT 24
+
+// Last experiment values
+// Distance last experiment. 2 bytes
+// with sign
+#define EEP_AD_DIST  3
+
+// original position of the previous experiment
+#define EEP_AD_POS_PREV 5 // 2 bytes
+// So we have: [EEP_AD_POS_ACT] = [EEP_AD_POS_PREV] + [EEP_AD_DIST]
+
+// Speed last experiment. short. 2 bytes
+// could be just 1 byte, but in case we get larger speeds
+#define EEP_AD_VEL   7
+
+// Time last experiment. 1 byte
+#define EEP_AD_SECS  9
+#define EEP_AD_MINS  10 // 1 byte
+#define EEP_AD_HOURS 11 // 2 bytes
+
+// distance calculated from halfsteps
+#define EEP_AD_DIST_HS  13  // 2 bytes
+
+// distance calculated from counting lines
+#define EEP_AD_DIST_LINE  15  // 2 bytes
+
+// number of halfsteps unsigned long 32 bits: 4 bytes
+#define EEP_AD_HS_CNT  17  // 4 bytes
+
+// number of lines short 16 bits: 2 bytes. less than 3000 lines
+// can be positive or negative
+#define EEP_AD_LINE_CNT  21  // 2 bytes
+
+// state of the endstops
+#define EEP_AD_ESTOP   23  // 1 bytes
+
+#define EEP_BIT_ESTOP_INI 0 // in the bit 0 of address EEP_AD_ESTOP
+#define EEP_BIT_ESTOP_END 1 // in the bit 1 of address EEP_AD_ESTOP
+
+// bits to make the mask
+#define EEP_MASK_ESTOP_INI 1<<EEP_BIT_ESTOP_INI // bit 0 of ad EEP_AD_ESTOP
+#define EEP_MASK_ESTOP_END 1<<EEP_BIT_ESTOP_END // bit 1 of ad EEP_AD_ESTOP
+
+// EEPPROM address EEP_AD_VALID
+#define EEP_VALID_DATA   1 //data from EEPROM is valid
+#define EEP_INVALID_DATA 0 //data from EEPROM is not valid
+#define EEP_ESTOP_ERR    2 //postion and endstop info doesnt match
+
+byte  eeprom_valid_read = EEP_INVALID_DATA;  // 0
+short pos_act_eep_read  =  0;  // 1,2
+short dist_eep_read     =  0;  // 3,4
+short pos_prev_eep_read =  0;  // 5,6
+short vel_eep_read      =  0;  // 7,8
+byte  secs_eep_read     =  0;  // 9
+byte  mins_eep_read     =  0;  // 10
+short hours_eep_read     =  0; // 11,12
+short dist_hs_eep_read   =  0; // 13,14 positive
+short dist_line_eep_read =  0; // 15,16 pos o neg
+short hs_cnt_eep_read    =  0; // 17,18,19,20
+short line_cnt_eep_read  =  0; // 21,22 pos o neg
+byte estop_ini_eep_read = 0; //23 taken from the same address
+byte estop_end_eep_read = 0; //23
+
 
 // short are 16bits
 // Speed of the Sandbox in mm/h, from 1 to 100, making it short, to have negative
 // to make some operations
 short vel_mmh = MAX_VEL;  // Speed of the Sandbox in mm/h, from 1 to 100
-short abs_dest = -1;  // absolute position of the destination, from x0 in mm
-short rel_dist = 1; // relative position of the destination, in absolute value
-short rel_dist_sign = 1; // relative position of the destination, including sign
-bool  rel_dist_neg = false;  // sign of rel_dist: 0: positive, 1: negative
-// relative position of the destination, from actual position, it is update when
-// actual position changes
-short rel_dest_updated = 0;
-
-short abs_init = -1;  // absolute initial position, if -1 is unknown
+short pos_dest = 0;  // absolute position of the destination, from x0 in mm
+//experiment's distance to the destination in mm, Magnitude (no sign)
+short dist_dest_magn = 1; //experiment's distance to the destination in mm, no sign 
+short dist_dest_wsign = 1; // relative position of the destination, with sign
+bool  is_dist_dest_neg = false;  //sign of dist_dest_magn: false: positive, true: negative
 
 volatile byte h_ustp_cnt = 0;    // Number of half usteps in a halfstep 0 to 31
 
@@ -160,10 +225,14 @@ volatile byte h_ustp_cnt = 0;    // Number of half usteps in a halfstep 0 to 31
 //               2,714,666.67 halfsteps (22 bits) So we can count them
 volatile unsigned long hstp_cnt = 0;   // Number of half steps, from initial position
 
-float absol_pos_mm = 0; // position from the x=0 in mm, absolute position
-// position from the initial position of the experimet, relative
-float relat_pos_mm_stp = 0; // calculated from halfsteps
-float relat_pos_mm_lin = 0; // calculated from lines
+// traveled distance in the experiment
+// Calculated from steps
+float traveled_mm_hs_f = 0; // float version calculated from halfsteps
+short traveled_mm_hs = 0; //  converted integer version
+
+// Calculated from lines
+float traveled_mm_lin_f = 0; // float version, will be converted calculated from lines
+short traveled_mm_lin = 0; // calculated from lines
  
 
 // array for the time of a half of a microstep (half time low, half high)
@@ -176,7 +245,7 @@ const float vec_t_h_ustp[] = {0,200,200,200,200,200,200,200,200,200,200,200,200,
 
 // it is byte because is less than 200
 byte t_half_ustp; // time that a half microstep takes, from the previous vector
-const byte SLEW_VEL_T_USTP = 200; // microseconds lower than the speed will be continuos
+const byte SLEW_VEL_T_H_USTP = 200; // microseconds lower than the speed will be continuos
 
 // array for the time of a half step (h_stp), it is only used when the time
 // a half microstep (h_ustp) is lower than 200. Otherwise, they would be out
@@ -199,15 +268,16 @@ const float vec_t_h_stp[] = {0,529411.76,264705.88,176470.59,132352.94,105882.35
 #define   ST_CONFIRM    5   // Confirming to start
 #define   ST_HOMING     6   // Homing
 #define   ST_RUN        7   // Running the experiment
-#define   ST_END        8   // Moving ended
+#define   ST_LAST_INFO  8   // Info last experiment  
+#define   ST_END        9   // Moving ended
 
 byte ui_state = ST_INI; 
 
-#define   TASK_HOME     0   // Task Go Home
-#define   TASK_MOVE_REL 1   // Task Movement relative
+#define   TASK_HOME      0   // Task Go Home
+#define   TASK_MOVE_DIST 1   // Task Movement relative
+#define   TASK_LAST_INFO 2   // Info last experiment
 
 byte task_st = TASK_HOME;
-//
 
 // indicates what parameter are we changing, moving on rows
 #define   SELPARAM_VEL    0   // changing the experiment velocity
@@ -230,12 +300,6 @@ byte seldigit_st = SELDIG_PARAM; //default state, no change
 #define   CONFIRM_NO     1    // No confirmation
 
 byte confirm_st = CONFIRM_YES;
-
-// variables relative to the experiment
-bool exp_homed = false;     // if the gantry has gone to the init endstop (home)
-// if the gantry has pass to the init experiment X (after homing)
-bool exp_pass_init = false;
-int fin = 0;           // Variable que para el experimento cuando llega al final de carrera 
 
 // LCD rotary encoder
 bool rot_enc1, rot_enc2;
@@ -263,6 +327,7 @@ bool rot_enc_left   = false;  // if LCD rotary encoder turned counter cw <-
 #define CHR_MICRO        228 // 0xE4: it is in the LCD charset
 #define CHR_RGHT_ARROW   126 // 0x7E: it is in the LCD charset
 #define CHR_LEFT_ARROW   127 // 0x7F: it is in the LCD charset
+#define CHR_ERR_ESTOP    174 // 0xAE: a kind of flipped E which can be error of endstop
 
 
 const byte IC_HL_DIAM[8] = // icon hollow diamond
@@ -405,8 +470,8 @@ void setup() {
   pinMode(ROT_ENC2_PIN, INPUT_PULLUP);     // LCD rotary encoder 2
   pinMode(ROT_ENCPB_PIN, INPUT_PULLUP);    // LCD rotary encoder pushbutton
   
-  pinMode(X_MIN_PIN, INPUT_PULLUP);   // Endstop init position
-  pinMode(X_MAX_PIN, INPUT_PULLUP);   // Endstop final position
+  pinMode(ESTOP_INI_PIN, INPUT_PULLUP);   // Endstop init position
+  pinMode(ESTOP_END_PIN, INPUT_PULLUP);   // Endstop final position
  
   pinMode (LPS_ENC1_PIN, INPUT);     // linear position sensor quadrature encoder 1
   pinMode (LPS_ENC2_PIN, INPUT);     // linear position sensor quadrature encoder 2
@@ -431,7 +496,7 @@ void setup() {
   lcd.createChar(CHR_MM, IC_MM);               // 6: milimiter
   lcd.createChar(CHR_PER_HOUR, IC_PER_HOUR);   // 7: per hour
  
-  digitalWrite(X_ENABLE_PIN , HIGH);  // Stepper motor disable. Active-low
+  digitalWrite(X_ENABLE_PIN , DISABLE_MOTOR); 
   digitalWrite(X_STEP_PIN , LOW);  // dont step at start
 
   init_screen();
@@ -475,6 +540,32 @@ byte nxt_ui_state(byte ui_state_arg, bool right, bool left)
   }
   return ui_state_arg;
 }
+
+// ------ next task
+// simple function that calculetes the next task state according
+// on the rotation of the knob
+// we could have used the global variable, but instead we use arguments:
+// task_st_arg
+byte nxt_task(byte task_st_arg, bool right, bool left)
+{
+  byte task_st_res = task_st_arg;
+
+  if (right == true) {
+    if (task_st_res == TASK_LAST_INFO) {
+      task_st_res = TASK_HOME;
+    } else {
+      task_st_res = task_st_res + 1;
+    }
+  } else if (left == true) {
+    if (task_st_res == TASK_HOME) { 
+      task_st_res = TASK_LAST_INFO;
+    } else { 
+      task_st_res = task_st_res - 1;
+    }
+  }
+  return task_st_res;
+}
+
 
 // ------ next parameter
 // simple function that calculates the next parameter selection state
@@ -571,6 +662,52 @@ short calc_incr(byte seldigit_st_arg, bool right, bool left)
 
 }
 
+// -------------- lcdprint_errcode
+// prints the error code of the error from the eeprom,
+// short_print is true, only 3 chars will be printed
+
+void lcdprint_errcode(byte eeprom_valid_read_arg)
+{
+  switch (eeprom_valid_read_arg) {
+    case EEP_VALID_DATA:
+      lcd.print(" VALID  ");
+      break;
+    case EEP_INVALID_DATA:
+      lcd.print("INVALID "); // data from the eeprom is not valid
+      break;
+    case EEP_ESTOP_ERR:
+      lcd.print("erENDST "); // there is an error with the position and endstop
+      break;
+  }
+} // lcdprint_errcode
+
+// -------------- lcdprint_val_err
+// prints the value or the error code
+// short_print is true, only 3 chars will be printed
+
+void lcdprint_val_err(int number, byte eeprom_valid_read_arg, int max_digit)
+{
+  int index = 0;
+
+  switch (eeprom_valid_read_arg) {
+    case EEP_VALID_DATA:
+      lcdprint_rght(number, max_digit);
+      break;
+    case EEP_INVALID_DATA:
+      for (index=0; index<max_digit-1; index++) {
+        lcd.print(" ");
+      }
+      lcd.print("?"); // data from the eeprom is not valid
+      break;
+    case EEP_ESTOP_ERR:
+      for (index=0; index<max_digit-1; index++) {
+        lcd.print(" ");
+      }
+      lcd.write(CHR_ERR_ESTOP); // there is an error with the position and endstop
+      break;
+  }
+} // lcdprint_val_err
+
 
 // -------------- lcdprint_rght
 // print an integer in the lcd aligned to the right
@@ -582,11 +719,9 @@ short calc_incr(byte seldigit_st_arg, bool right, bool left)
 void lcdprint_rght (int number, int max_digit)
 {
   int index = 0;
-  // write whitespaces to delete what is down
-  
   int max_number;
 
-  max_number = int(pow(10, max_digit-1));
+  max_number = round(pow(10, max_digit-1));
 
   //lcd.setCursor(col, row);
   for (index = 0; index < max_digit-1; index++) {
@@ -597,8 +732,82 @@ void lcdprint_rght (int number, int max_digit)
     lcd.print("0");
   }  
   lcd.print(number);
+}
+// lcdprint_rght
+
+
+// -------------- lcdprint_rght_sign
+// print an integer in the lcd aligned to the right
+// number: number to print
+// col: colum to start printing (most left)
+// row: row to print
+// max_digit : maximum number of digits to be printed. Needed to align right
+// the + - sign is included, but does not count in the digit
+// for example to print +003 , max_digit is 3
+
+void lcdprint_rght_sign (int number, byte max_digit)
+{
+  byte index = 0;
+  int  max_number;
+  int  number_positive;
+
+  if (number >= 0) {
+    lcd.print("+");
+    number_positive = number;
+  } else {
+    lcd.print("-");
+    number_positive = - number;
+  }
+
+  max_number = int(pow(10, max_digit-1));
+
+  //lcd.setCursor(col, row);
+  for (index = 0; index < max_digit-1; index++) {
+    if (number_positive >= max_number) {
+      break;
+    }
+    max_number = int(max_number/10);
+    lcd.print("0");
+  }  
+  lcd.print(number_positive);
+}
+
+// -------------- lcdprint_errcode
+// print an integer in the lcd aligned to the right
+// number: number to print
+// max_digit : maximum number of digits to be printed. Needed to align right
+// if the number is negative, it is an error code, it will print error
+
+void lcdprint_errcode (int number, int max_digit)
+{
+  int index = 0;
+  
+  int max_number;
+                     //0123456789  I think ten is more than enough
+  char error_code[] = "Error     ";
+
+  if (number >= 0) {
+    max_number = int(pow(10, max_digit-1));
+    for (index = 0; index < max_digit-1; index++) {
+      if (number >= max_number) {
+        break;
+      }
+      max_number = int(max_number/10);
+      lcd.print("0");
+    }  
+    lcd.print(number);
+  } else { // error code
+    if (max_digit > 10) {
+      max_digit = 10;
+    }
+    for (index = 0; index < max_digit-1; index++) {
+      lcd.write(error_code[index]);
+    }
+  }
 
 }
+// lcdprint_errcode
+
 
 // ------------------ Rotary encoder read 
 
@@ -662,23 +871,20 @@ bool rot_encoder_pushed()
   return pushed;
 }
 
-// ---------- lcdprint_endstops
-// -- print the state of the endstops, the position in the LCD has to be
-// -- set before the function call
+// ---------- lcdprint_endstops_arg
+// -- print the state of the eeprom endstops given by the arguments,
+// -- the position in the LCD has to be set before the function call
 
-void lcdprint_endstops()
+void lcdprint_endstops_arg(byte estop_ini_arg, byte estop_end_arg)
 {
-  endstop_x_ini = digitalRead(X_MIN_PIN);
-  endstop_x_end = digitalRead(X_MAX_PIN);
-  
-  if (endstop_x_ini == ENDSTOP_ON) {
-    if (endstop_x_end == ENDSTOP_ON) {
+  if (estop_ini_arg == ESTOP_ON) {
+    if (estop_end_arg == ESTOP_ON) {
       lcd.write(byte(CHR_FL_FL_BOX));
     } else {
       lcd.write(byte(CHR_FL_HL_BOX));
     }
   } else {
-    if (endstop_x_end == ENDSTOP_ON) {
+    if (estop_end_arg == ESTOP_ON) {
       lcd.write(byte(CHR_HL_FL_BOX));
     } else {
       lcd.write(byte(CHR_HL_HL_BOX));
@@ -686,6 +892,51 @@ void lcdprint_endstops()
   }
 }
 
+
+// ---------- lcdprint_endstops
+// -- print the state of the endstops, the position in the LCD has to be
+// -- set before the function call
+
+void lcdprint_endstops()
+{
+  estop_ini = digitalRead(ESTOP_INI_PIN);
+  estop_end = digitalRead(ESTOP_END_PIN);
+  
+  if (estop_ini == ESTOP_ON) {
+    if (estop_end == ESTOP_ON) {
+      lcd.write(byte(CHR_FL_FL_BOX));
+    } else {
+      lcd.write(byte(CHR_FL_HL_BOX));
+    }
+  } else {
+    if (estop_end == ESTOP_ON) {
+      lcd.write(byte(CHR_HL_FL_BOX));
+    } else {
+      lcd.write(byte(CHR_HL_HL_BOX));
+    }
+  }
+}
+
+// --------- endstop_hit_vel
+// -- reads the value of the endstop that is in the direction of the velocity
+// -- and returns true if it has bin hit
+
+bool endstop_hit_vel ()
+{
+
+  if (is_dist_dest_neg) { // if the distance is negative
+    estop_ini = digitalRead(ESTOP_INI_PIN); // read and save it in global var
+    if (estop_ini == ESTOP_ON) {
+      return true;
+    }
+  } else { // distance positive, check the max pin
+    estop_end = digitalRead(ESTOP_END_PIN);
+    if (estop_end == ESTOP_ON) {
+      return true;
+    }
+  }
+  return false;
+}
 
 // ------ ST_INI: initial state
 
@@ -709,40 +960,37 @@ void init_screen()
 }
 
 
-// ---------------- run relative screen
-// -- moving a relative distancie
-void runrel_screen()
+// ---------------- run distance screen
+// -- moving a relative distance
+void run_dist_screen()
 {
   byte row = 0;
 
   lcd.createChar(CHR_X0, IC_X0); //
   lcd.createChar(CHR_XF, IC_XF); //
 
+  if (eeprom_valid_read  == EEP_VALID_DATA) {
+    pos_dest = pos_act_eep_read + dist_dest_wsign; 
+  }
+
   lcd.clear();
   // -- row 0 
   row = 0;
   lcd.setCursor(0, row);
            //1234567890123456789
-  lcd.print("RUNREL");
+  lcd.print("D:");
+  lcdprint_rght_sign(dist_dest_wsign,3);
+
+  lcd.print(" ");
   lcd.write(CHR_XF);
   lcd.print("=");
-  if (pos_x_eep_read == -1) {
-    lcd.print("  ?");
-    abs_dest = -1;
-  } else {
-    abs_dest = pos_x_eep_read + rel_dist_sign;
-    lcdprint_rght(abs_dest,3);
-  }
+  lcdprint_val_err(pos_dest, eeprom_valid_read, 3);
   lcd.write(CHR_MM);
 
-  lcd.print("|");
+  lcd.print(" ");
   lcd.write(byte(CHR_X0));
   lcd.print("=");
-  if (pos_x_eep_read == -1) {
-    lcd.print("  ?");
-  } else {
-    lcdprint_rght(pos_x_eep_read,3);
-  }
+  lcdprint_val_err(pos_act_eep_read, eeprom_valid_read, 3);
   lcd.write(CHR_MM);
 
   // -- row 1 
@@ -760,12 +1008,13 @@ void runrel_screen()
   row = 2;
   lcd.setCursor(0, row);
          //  0123456
-  lcd.print("dS=");
-  if (rel_dist_neg == false) {
-    lcd.print("+");
-  } else {
-    lcd.print("-");
-  }
+  lcd.print("dS= ");
+  // no need to print sign, it will be printed with the number
+  //if (is_dist_dest_neg == true) {
+  //  lcd.print("-");
+  //} else {
+  //  lcd.print("+");
+  //}
   lcd.print("  0");
   lcd.write(CHR_MM);
            //8901
@@ -776,12 +1025,13 @@ void runrel_screen()
   lcd.setCursor(0, row);
 
          //  01234567
-  lcd.print("dL=");
-  if (rel_dist_neg == false) {
-    lcd.print("+");
-  } else {
-    lcd.print("-");
-  }
+  lcd.print("dL= ");
+  // no need to print sign, it will be printed with the number
+  //if (is_dist_dest_neg == true) {
+  //  lcd.print("-");
+  //} else {
+  //  lcd.print("+");
+  //}
   lcd.print("  0");
   lcd.write(CHR_MM);
 
@@ -793,22 +1043,22 @@ void runrel_screen()
   lcdprint_endstops();
 
   // init the displacement
-  relat_pos_mm_stp = 0; // calculated from halfsteps
-  relat_pos_mm_lin = 0; // calculated from lines
+  traveled_mm_hs = 0; // calculated from halfsteps
+  traveled_mm_lin = 0; // calculated from lines
 
-  if (rel_dist_neg == false) {
-    digitalWrite(X_DIR_PIN, DIR_MOTOR_POS); 
-  } else {
+  if (is_dist_dest_neg == true) {
     digitalWrite(X_DIR_PIN, DIR_MOTOR_NEG); // motor back
+  } else {
+    digitalWrite(X_DIR_PIN, DIR_MOTOR_POS); 
   }
-}
+} //run_dist_screen
 
-// -------------- running_rel  run experiment with relative distance
-// update the runrel variables on the screen
+// -------------- run_distance  run experiment with relative distance
+// update the run_dist variables on the screen
 // this function stays in a loop until the distance is traversed,
 // or any of the endstops are active
 
-void running_rel() {
+void run_distance() {
 
   // no need to use global vars o static, we remain in this function
 
@@ -825,10 +1075,11 @@ void running_rel() {
   byte          minute_cnt_prev   = 0;
   short         hour_cnt_prev     = 0;
 
-  while ((relat_pos_mm_stp <= rel_dist) &&
-        !(relat_pos_mm_stp > 1 && (  // stop if any endstop is high, after starting, it can be made better
-          endstop_x_ini == ENDSTOP_ON ||
-          endstop_x_end == ENDSTOP_ON))) {
+  // we will be running the experiment provided that:
+  // - the traveled distance is less than the total distance
+  // - we haven't hit the endstop on the direction we are moving
+  while ((traveled_mm_hs < dist_dest_magn) &&
+          !endstop_hit_vel())  {
 
     // disable interrupts to make a copy to avoid corruption
     // for seconds minutes is not necessary because they are byte
@@ -840,22 +1091,25 @@ void running_rel() {
 
     if (hstp_cnt_copy != hstp_cnt_prev) {
       lcd.setCursor(4, 2);
-      relat_pos_mm_stp = ADVAN_HSTEP * hstp_cnt_copy;
-      lcdprint_rght(int(relat_pos_mm_stp),3);
-      lcd.setCursor(12, 2);
-      lcd.print(hstp_cnt_copy);
+      traveled_mm_hs_f = ADVAN_HSTEP * hstp_cnt_copy;
+      // cannot be rounded, but floor, because it has to reach it
+      traveled_mm_hs = floor(traveled_mm_hs_f); // cann
+      lcdprint_rght(traveled_mm_hs,3);
+      //lcd.setCursor(12, 2);
+      //lcd.print(hstp_cnt_copy);
       hstp_cnt_prev = hstp_cnt_copy;
     }
 
     if (lps_line_cnt_copy != lps_line_cnt_prev) {
       lcd.setCursor(4, 3);
-      relat_pos_mm_lin = mm_per_lps_line * lps_line_cnt_copy;
-      lcdprint_rght(int(relat_pos_mm_lin),3);
+      traveled_mm_lin_f = mm_per_lps_line * lps_line_cnt_copy;
+      // cannot be rounded, but floor, because it has to reach it
+      traveled_mm_lin = floor(traveled_mm_lin_f);
+      lcdprint_rght_sign(traveled_mm_lin,3);
       lcd.setCursor(12, 3);
       lcd.print(lps_line_cnt_copy);
       lps_line_cnt_prev = lps_line_cnt_copy;
-    }
-    
+    } 
     if (sec_cnt != sec_cnt_prev) {
       if (minute_cnt != minute_cnt_prev) {
         if (hour_cnt_copy != hour_cnt_prev) {
@@ -872,16 +1126,16 @@ void running_rel() {
       sec_cnt_prev = sec_cnt;
     }
 
-    // endstop print, it reads the enstops, for the while
+    // endstop print, it reads the enstops (maybe it should not be here
+    // because it is done also in the while)
     lcd.setCursor(19, 3);
     lcdprint_endstops();
   }
 
   // deactivate interrupts
   disable_isr();
-  // save values in EEPROM
-  // HOMED state
-}
+  save2eeprom();
+} // run_distance()
 
 
 
@@ -895,7 +1149,7 @@ void homing_screen()
   lcd.createChar(CHR_X0, IC_X0); //
   lcd.createChar(CHR_XF, IC_XF); //
 
-  abs_dest = 0;  // destination is 0
+  pos_dest = 0;  // destination is 0
 
   lcd.clear();
   // -- row 0 
@@ -911,11 +1165,7 @@ void homing_screen()
   lcd.print("|");
   lcd.write(byte(CHR_X0));
   lcd.print("=");
-  if (pos_x_eep_read == -1) {
-    lcd.print("  ?");
-  } else {
-    lcdprint_rght(pos_x_eep_read,3);
-  }
+  lcdprint_val_err(pos_act_eep_read, eeprom_valid_read, 3);
   lcd.write(CHR_MM);
 
   // -- row 1 
@@ -954,7 +1204,7 @@ void homing_screen()
   lcdprint_endstops();
 
   digitalWrite(X_DIR_PIN, DIR_MOTOR_NEG); //homing:  motor back
-}
+} //homing_screen()
 
 
 // -------------- homing
@@ -978,29 +1228,33 @@ void homing() {
   byte          minute_cnt_prev   = 0;
   short         hour_cnt_prev     = 0;
 
-  while (endstop_x_ini == ENDSTOP_OFF) {
+  while (estop_ini == ESTOP_OFF) {
 
     // disable interrupts to make a copy to avoid corruption
     // for seconds minutes is not necessary because they are byte
-    noInterrupts();
+    noInterrupts(); // -----------
     hstp_cnt_copy     = hstp_cnt;
     lps_line_cnt_copy = lps_line_cnt;
     hour_cnt_copy     = hour_cnt;
-    interrupts();
+    interrupts();   // -----------
 
     if (hstp_cnt_copy != hstp_cnt_prev) {
       lcd.setCursor(4, 2);
-      relat_pos_mm_stp = ADVAN_HSTEP * hstp_cnt_copy;
-      lcdprint_rght(int(relat_pos_mm_stp),3);
-      lcd.setCursor(12, 2);
-      lcd.print(hstp_cnt_copy);
+      traveled_mm_hs_f = ADVAN_HSTEP * hstp_cnt_copy;
+      // cannot be rounded, but floor, because it has to reach it
+      traveled_mm_hs = floor(traveled_mm_hs_f);
+      lcdprint_rght(traveled_mm_hs,3);
+      //lcd.setCursor(12, 2);  // too much info to print
+      //lcd.print(hstp_cnt_copy);
       hstp_cnt_prev = hstp_cnt_copy;
     }
 
     if (lps_line_cnt_copy != lps_line_cnt_prev) {
       lcd.setCursor(4, 3);
-      relat_pos_mm_lin = mm_per_lps_line * lps_line_cnt_copy;
-      lcdprint_rght(int(relat_pos_mm_lin),3);
+      traveled_mm_lin_f = mm_per_lps_line * lps_line_cnt_copy;
+      // cannot be rounded, but floor, because it has to reach it
+      traveled_mm_lin = floor(traveled_mm_lin_f);
+      lcdprint_rght_sign(traveled_mm_lin,3);
       lcd.setCursor(12, 3);
       lcd.print(lps_line_cnt_copy);
       lps_line_cnt_prev = lps_line_cnt_copy;
@@ -1022,31 +1276,19 @@ void homing() {
       sec_cnt_prev = sec_cnt;
     }
 
-    // endstop print, it reads the enstops, for the while
+    // lcdprint_endstops, it reads the enstops, for the while
     lcd.setCursor(19, 3);
     lcdprint_endstops();
   }
 
   // deactivate interrupts
   disable_isr();
-  save2eeprom();
+  // the distance that have been traveled
+  dist_dest_wsign = - traveled_mm_hs;
   // save values in EEPROM
+  save2eeprom();
   // HOMED state
-}
-
-void save2eeprom()
-{
-  byte eeprom_valid = 1;
-
-  EEPROM.put(EEP_DIR_VALID, eeprom_valid);
-  EEPROM.put(EEP_DIR_POS_X, abs_dest);
-  EEPROM.put(EEP_DIR_DIST,  rel_dist);
-  EEPROM.put(EEP_DIR_VEL,   vel_mmh);
-  EEPROM.put(EEP_DIR_SECS,  sec_cnt);
-  EEPROM.put(EEP_DIR_MINS,  minute_cnt);
-  EEPROM.put(EEP_DIR_HOURS, hour_cnt);
-
-}
+} //homing()
 
 
 // -------------- Interrupt function to count seconds
@@ -1086,6 +1328,7 @@ void h_ustp_fast_isr() {
     h_ustp_cnt_loc ++;
   }
   //first time, it was 0 until the interruption comes
+  // even numbers it will be LOW, odds number it will be HIGH
   digitalWrite(X_STEP_PIN , bitRead(h_ustp_cnt_loc,0));
 
 
@@ -1124,7 +1367,6 @@ void h_ustp_slow_isr() {
     digitalWrite(X_STEP_PIN, bitRead(h_ustp_cnt,0));
   }
 
-
   /* another option
   static byte step_value = LOW; // signal to send to stepper motor pin
   // this function uses a global h_ustp_cnt variable, unlike h_ustp_fast_isr
@@ -1159,38 +1401,101 @@ void lin_encoder_isr() {
   }
 }
 
+//---------------- save2eeprom
 
-
-// ------------------------ check_pos_x_eeprom
-// -- get the value of the gantry position saved in EEPROM
-
-void check_pos_x_eeprom()
+void save2eeprom()
 {
-  endstop_x_ini = digitalRead(X_MIN_PIN);
-  endstop_x_end = digitalRead(X_MAX_PIN);
+  byte estop_eep_save = 0;
 
-  EEPROM.get(EEP_DIR_VALID, eeprom_valid_read);
+  estop_ini = digitalRead(ESTOP_INI_PIN);
+  estop_end = digitalRead(ESTOP_END_PIN);
 
-  if (eeprom_valid_read == 1) {
-    EEPROM.get(EEP_DIR_POS_X, pos_x_eep_read);
-    EEPROM.get(EEP_DIR_DIST,  dist_eep_read);
-    EEPROM.get(EEP_DIR_VEL,   vel_eep_read);
-    EEPROM.get(EEP_DIR_SECS,  secs_eep_read);
-    EEPROM.get(EEP_DIR_MINS,  mins_eep_read);
-    EEPROM.get(EEP_DIR_HOURS, hours_eep_read);
+  estop_eep_save = ((estop_end << EEP_BIT_ESTOP_END) ||
+                    (estop_ini << EEP_BIT_ESTOP_INI));
+  
+  EEPROM.put(EEP_AD_POS_ACT,  pos_dest);
+  EEPROM.put(EEP_AD_DIST,     dist_dest_wsign);
+  EEPROM.put(EEP_AD_POS_PREV, pos_act_eep_read);
+  EEPROM.put(EEP_AD_VEL,      vel_mmh);
+  EEPROM.put(EEP_AD_SECS,     sec_cnt);
+  EEPROM.put(EEP_AD_MINS,     minute_cnt);
+  EEPROM.put(EEP_AD_HOURS,    hour_cnt);
+  EEPROM.put(EEP_AD_DIST_HS,   traveled_mm_hs);
+  EEPROM.put(EEP_AD_DIST_LINE, traveled_mm_lin);
+  EEPROM.put(EEP_AD_HS_CNT,    hstp_cnt);
+  EEPROM.put(EEP_AD_LINE_CNT,  lps_line_cnt);
+  EEPROM.put(EEP_AD_ESTOP,     estop_eep_save);
+
+  EEPROM.put(EEP_AD_VALID,   EEP_VALID_DATA); // all the data has ben saved
+
+  // --- now that all the data has been saved, put it to their initial values
+
+  //pos_dest = 0;
+  dist_dest_magn = 1;
+  dist_dest_wsign = 1;
+  is_dist_dest_neg = false;
+
+  hstp_cnt  = 0;
+  h_ustp_cnt = 0;
+
+  traveled_mm_hs = 0;
+  traveled_mm_lin = 0;
+
+  sec_cnt = 0;
+  minute_cnt = 0;
+  hour_cnt = 0;
+} //save2eeprom
+
+
+// ------------------------ check_eeprom
+// -- get the value of the gantry position saved in EEPROM
+// -- AAA the congruence should be checked from the endstops and 
+// -- the read positions
+
+void check_eeprom()
+{
+  byte estop_eep_read;
+
+  estop_ini = digitalRead(ESTOP_INI_PIN);
+  estop_end = digitalRead(ESTOP_END_PIN);
+
+  EEPROM.get(EEP_AD_VALID, eeprom_valid_read);
+
+  if (eeprom_valid_read == EEP_VALID_DATA) {
+    EEPROM.get(EEP_AD_POS_ACT,   pos_act_eep_read);
+    EEPROM.get(EEP_AD_DIST,      dist_eep_read);
+    EEPROM.get(EEP_AD_POS_PREV,  pos_prev_eep_read);
+    EEPROM.get(EEP_AD_VEL,       vel_eep_read);
+    EEPROM.get(EEP_AD_SECS,      secs_eep_read);
+    EEPROM.get(EEP_AD_MINS,      mins_eep_read);
+    EEPROM.get(EEP_AD_HOURS,     hours_eep_read);
+    EEPROM.get(EEP_AD_DIST_HS,   dist_hs_eep_read);
+    EEPROM.get(EEP_AD_DIST_LINE, dist_line_eep_read);
+    EEPROM.get(EEP_AD_HS_CNT,    hs_cnt_eep_read);
+    EEPROM.get(EEP_AD_LINE_CNT,  line_cnt_eep_read);
+    EEPROM.get(EEP_AD_ESTOP,     estop_eep_read);
+
+    // if the bit given by EEP_MASK_ESTOP_INI  is 1,
+    // result 1, if it is 0, result 0
+    estop_ini_eep_read = (estop_eep_read & EEP_MASK_ESTOP_INI);
+    estop_ini_eep_read = estop_ini_eep_read >> EEP_BIT_ESTOP_INI;
+    // this las sentence is equivalent to:
+    // estop_ini_eep_read = min(estop_ini_eep_read, 1);
+
+    // if the bit 1 is 1, result 1, if it is 0, result 0
+    estop_end_eep_read = (estop_eep_read & EEP_MASK_ESTOP_END);
+    estop_end_eep_read = estop_end_eep_read >> EEP_BIT_ESTOP_END;
+    // this las sentence is equivalent to:
+    // estop_end_eep_read = min(estop_end_eep_read, 1);
+
+    if ((estop_ini_eep_read != estop_ini) ||
+        (estop_end_eep_read != estop_end)) {
+      eeprom_valid_read = EEP_ESTOP_ERR;
+    }
   } else {
-    pos_x_eep_read = -1;  
+    eeprom_valid_read = EEP_INVALID_DATA;
   }
-  /*
-  if (endstop_x_ini == ENDSTOP_ON) {
-    pos_x_eeprom = 0;
-    EEPROM.put(EEPROM_DIR, pos_x_eeprom);
-  } else if (endstop_x_end == ENDSTOP_ON) {
-    pos_x_eeprom = TOT_LEN; // AAA: this value has to be calculated
-    EEPROM.put(EEPROM_DIR, pos_x_eeprom);
-  }
-  */
-}
+} //check_eeprom
 
 
 
@@ -1200,70 +1505,85 @@ void check_pos_x_eeprom()
 void task_menu()
 {
 
+  lcd.createChar(CHR_HL_DIAM, IC_HL_DIAM); // 0: hollow diamond
+  lcd.createChar(CHR_FL_DIAM, IC_FL_DIAM); // 1: full diamond
   lcd.clear();
   lcd.setCursor(1, 0);
   lcd.print("Go Home");
 
   lcd.setCursor(1, 1);
-  lcd.print("Relative move");
+  lcd.print("Move distance");
+
+  lcd.setCursor(1, 2);
+  lcd.print("Info last experimen");
 
   lcd.setCursor(LCD_EEP_POS_COL, 3);
   lcd.print("|x:");
-  if (pos_x_eep_read == -1) {
-    lcd.print("  ?");
-  } else {
-    lcdprint_rght(pos_x_eep_read,3);
-  }
+  lcdprint_val_err(pos_act_eep_read, eeprom_valid_read, 3);
   lcd.write(CHR_MM);
 
   lcd.setCursor(0, 0);
-  if (task_st == TASK_HOME) {
-    lcd.write(byte(CHR_FL_DIAM));
-    lcd.setCursor(0, 1);
-    lcd.write(byte(CHR_HL_DIAM));
-  } else {
-    lcd.write(byte(CHR_HL_DIAM));
-    lcd.setCursor(0, 1);
-    lcd.write(byte(CHR_FL_DIAM));
+  lcd.write(byte(CHR_HL_DIAM));
+  lcd.setCursor(0, 1);
+  lcd.write(byte(CHR_HL_DIAM));
+  lcd.setCursor(0, 2);
+  lcd.write(byte(CHR_HL_DIAM));
+  switch (task_st) {
+    case TASK_HOME:
+      lcd.setCursor(0, 0);
+      break;
+    case TASK_MOVE_DIST:
+      lcd.setCursor(0, 1);
+      break;
+    case TASK_LAST_INFO:
+      lcd.setCursor(0, 2);
+      break;
   }
+  lcd.write(byte(CHR_FL_DIAM));
 
   // endstop print
   lcd.setCursor(19, 3);
   lcdprint_endstops();
 
-}
+}//task_menu
 
 // ------------------- update_task_menu
 
 void update_task_menu()
 {
-
   static byte task_st_prev = TASK_HOME;
 
   if (task_st_prev != task_st) {
     // draw the diamonds
     lcd.setCursor(0, 0);
-    if (task_st == TASK_HOME) {
-      lcd.write(byte(CHR_FL_DIAM));
-      lcd.setCursor(0, 1);
-      lcd.write(byte(CHR_HL_DIAM));
-    } else {
-      lcd.write(byte(CHR_HL_DIAM));
-      lcd.setCursor(0, 1);
-      lcd.write(byte(CHR_FL_DIAM));
+    lcd.write(byte(CHR_HL_DIAM));
+    lcd.setCursor(0, 1);
+    lcd.write(byte(CHR_HL_DIAM));
+    lcd.setCursor(0, 2);
+    lcd.write(byte(CHR_HL_DIAM));
+    switch (task_st) {
+      case TASK_HOME:
+        lcd.setCursor(0, 0);
+        break;
+      case TASK_MOVE_DIST:
+        lcd.setCursor(0, 1);
+        break;
+      case TASK_LAST_INFO:
+        lcd.setCursor(0, 2);
+        break;
     }
+    lcd.write(byte(CHR_FL_DIAM));
+
     // endstop print (just in case)
     lcd.setCursor(19, 3);
     lcdprint_endstops();
   }
   task_st_prev = task_st;
-}
-
+} //update_task_menu
 
 
 void param_menu ()
 {
-
   lcd.clear();
   // -- row 0
   lcd.setCursor(0, 0);
@@ -1293,15 +1613,9 @@ void param_menu ()
     } else {
       lcd.write(byte(CHR_HL_DIAM));
     }
-    lcd.print("Dist(d):");
+    lcd.print("Dist(d): ");
     lcd.setCursor(11, 1);
-    if (rel_dist_neg == true) {
-      lcd.print("-");
-    } else {
-      lcd.print("+");
-    }
-    lcd.setCursor(12, 1);
-    lcdprint_rght(rel_dist,3);
+    lcdprint_rght_sign(dist_dest_wsign,3);
     lcd.setCursor(16, 1);
     lcd.write(CHR_MM);
   }
@@ -1331,18 +1645,15 @@ void param_menu ()
   // aditional info:
   lcd.setCursor(LCD_EEP_POS_COL, 3);
   lcd.print("|x:");
-  if (pos_x_eep_read == -1) {
-    lcd.print("  ?");
-  } else {
-    lcdprint_rght(pos_x_eep_read,3);
-  }
+  lcdprint_val_err(pos_act_eep_read, eeprom_valid_read, 3);
   lcd.write(CHR_MM);
 
   // endstop print
   lcd.setCursor(19, 3);
   lcdprint_endstops();
-}
+} //param_menu
 
+// -- updates the menu of parameters when they have been changed
 
 void update_param_menu() {
 
@@ -1350,8 +1661,9 @@ void update_param_menu() {
   static byte ui_state_prev = ST_SEL_PARAMS;
   static byte selparam_st_prev = SELPARAM_VEL;
   static byte seldigit_st_prev = SELDIG_PARAM;
-  static short rel_dist_prev = 0; // relative destination
-  static bool  rel_dist_neg_prev = false; // sign
+  // relative destination distance, no sign
+  static short dist_dest_magn_prev = 0; // relative destination distance, no sign
+  static bool  is_dist_dest_neg_prev = false; // sign
   static short vel_mmh_prev  = MAX_VEL;  
 
   if (ui_state >= ST_SEL_PARAMS && ui_state <= ST_SEL_VALUE) {
@@ -1431,13 +1743,13 @@ void update_param_menu() {
       lcdprint_rght(vel_mmh,3); //3 is the number of digits
     }
     if (task_st != TASK_HOME) {
-      if (rel_dist != rel_dist_prev) {
+      if (dist_dest_magn != dist_dest_magn_prev) {
         lcd.setCursor(LCD_PARAMS_COL, SELPARAM_DIST);
-        lcdprint_rght(rel_dist,3); //3 is the number of digits
+        lcdprint_rght(dist_dest_magn,3); //3 is the number of digits
       }
-      if (rel_dist_neg != rel_dist_neg_prev) {
-        lcd.setCursor(col, SELPARAM_DIST);
-        if (rel_dist_neg == true) {
+      if (is_dist_dest_neg != is_dist_dest_neg_prev) {
+        lcd.setCursor(LCD_PARAMS_COL-1, SELPARAM_DIST);
+        if (is_dist_dest_neg) {
           lcd.print("-");
         } else {
           lcd.print("+");          
@@ -1445,12 +1757,12 @@ void update_param_menu() {
       }
     }
 
-    if  ((ui_state_prev    != ui_state       ) ||
-         (selparam_st_prev != selparam_st    ) ||
-         (seldigit_st_prev != seldigit_st    ) ||
-         (rel_dist_prev    != rel_dist       ) ||
-         (rel_dist_neg_prev != rel_dist_neg  ) ||         
-         (vel_mmh_prev     != vel_mmh        )) {  
+    if  ((ui_state_prev         != ui_state       ) ||
+         (selparam_st_prev      != selparam_st    ) ||
+         (seldigit_st_prev      != seldigit_st    ) ||
+         (dist_dest_magn_prev   != dist_dest_magn ) ||
+         (is_dist_dest_neg_prev != is_dist_dest_neg  ) ||         
+         (vel_mmh_prev          != vel_mmh        )) {  
       lcd.setCursor(col, selparam_st); //row is directly defined by selparam_st
     }
   }
@@ -1459,20 +1771,19 @@ void update_param_menu() {
   ui_state_prev     = ui_state;
   selparam_st_prev  = selparam_st;
   seldigit_st_prev  = seldigit_st;
-  rel_dist_prev     = rel_dist;
-  rel_dist_neg_prev = rel_dist_neg;
+  dist_dest_magn_prev = dist_dest_magn;
+  is_dist_dest_neg_prev = is_dist_dest_neg;
   vel_mmh_prev      = vel_mmh;
-}
+} //update_param_menu
 
 
 //----------- confirm_menu
 
 void confirm_menu ()
 {
-
   lcd.clear();
-  // -- row 0
 
+  // -- row 0
   lcd.setCursor(1, 0);
   lcd.print("Speed:");
   lcd.setCursor(12, 0);
@@ -1490,13 +1801,7 @@ void confirm_menu ()
     lcd.setCursor(1, 1);
     lcd.print("Dist(d):");
     lcd.setCursor(11, 1);
-    if (rel_dist_neg == true) {
-      lcd.print("-");
-    } else {
-      lcd.print("+");
-    }
-    lcd.setCursor(12, 1);
-    lcdprint_rght(rel_dist,3);
+    lcdprint_rght_sign(dist_dest_wsign,3);
     lcd.setCursor(16, 1);
     lcd.write(CHR_MM);
   }
@@ -1525,19 +1830,13 @@ void confirm_menu ()
   // aditional info:
   lcd.setCursor(LCD_EEP_POS_COL, 3);
   lcd.print("|x:");
-  if (pos_x_eep_read == -1) {
-    lcd.print("  ?");
-  } else {
-    lcdprint_rght(pos_x_eep_read,3);
-  }
+  lcdprint_val_err(pos_act_eep_read, eeprom_valid_read, 3);
   lcd.write(CHR_MM);
 
   // endstop print
   lcd.setCursor(19, 3);
   lcdprint_endstops();
-}
-
-
+} // confirm_menu
 
 //----------- update_confirm_menu
 
@@ -1563,20 +1862,101 @@ void update_confirm_menu ()
   } else {
     lcd.write(byte(CHR_HL_DIAM));
   }
+} //update_confirm_menu
 
-}
+// --------------- last_info_menu
+// -- displays the information of the last experiment.
+// -- it doesnt read from the EEPROM because it has been already read
+
+void last_info_menu()
+{
+
+  byte row = 0;
+
+  lcd.createChar(CHR_X0, IC_X0); //
+  lcd.createChar(CHR_XF, IC_XF); //
+
+  lcd.clear();
+  // -- row 0 
+  row = 0;
+  lcd.setCursor(0, row);
+  lcdprint_errcode(eeprom_valid_read);
+  lcd.write(CHR_XF);
+  lcd.print("=");
+  lcdprint_errcode(pos_act_eep_read,3);
+  lcd.write(CHR_MM);
+
+  lcd.print("|");
+  lcd.write(byte(CHR_X0));
+  lcd.print("=");
+  lcdprint_errcode(pos_prev_eep_read,3);
+  lcd.write(CHR_MM);
+
+  // -- row 1 
+  row = 1;
+  lcd.setCursor(0, row);
+  lcd.print("v=");
+  lcdprint_rght(vel_eep_read,3);
+  lcd.write(CHR_MM);
+  lcd.write(CHR_PER_HOUR);
+
+           //7890123456789
+  lcd.print("  ");
+  lcdprint_rght(hours_eep_read,2);
+  lcd.print("h ");
+  lcdprint_rght(mins_eep_read,2);
+  lcd.print("m ");
+  lcdprint_rght(secs_eep_read,2);
+  lcd.print("s");
+
+  // -- row 2 steps
+  row = 2;
+  lcd.setCursor(0, row);
+         //  0123456
+  lcd.print("d=");
+  lcdprint_rght_sign(dist_eep_read,3);
+  lcd.write(CHR_MM);
+
+  lcd.print(" hs=");
+  lcd.print(hs_cnt_eep_read);
+
+  // -- row 3 lines
+  row = 3;
+  lcd.setCursor(0, row);
+         //  01234567
+  lcd.print("dS=");
+  lcdprint_rght(dist_hs_eep_read,3);
+  lcd.write(CHR_MM);
+
+  lcd.print(" dL=");
+  lcdprint_rght_sign(dist_line_eep_read,3);
+  lcd.write(CHR_MM);
+
+
+
+
+
+  // EEPROM endstop print
+  lcd.setCursor(18, 3);
+  lcdprint_endstops_arg(estop_ini_eep_read, estop_end_eep_read);
+
+  // endstop print
+  lcdprint_endstops();
+
+} //last_info_menu
 
 // ---------------- disable interrupts
-// when finishing the experiment
+// when finishing the experiment.
+// Motors are also disabled
 
 void disable_isr()
 {
-  byte t_half_ustp; // time that a half microstep takes
-  unsigned long t_half_stp; // time that a half of a step takes
 
+  t_half_ustp; // time that a half microstep takes
+  digitalWrite(X_ENABLE_PIN , DISABLE_MOTOR);
   Timer1.detachInterrupt(); // microstep interrupt
-  if (t_half_ustp == 200) { // slow speed
-    Timer4.detachInterrupt(); // there has no interrupt for halfsteps
+  if (t_half_ustp == SLEW_VEL_T_H_USTP) { // slow speed
+    Timer4.detachInterrupt(); // there was interrupt for halfsteps
   }
   // interrupt for the linear position sensor
   detachInterrupt(digitalPinToInterrupt(LPS_ENC1_PIN));
@@ -1585,13 +1965,20 @@ void disable_isr()
 
 
 // ---------------- enable interrupts
-// when starting the experiment
+// when starting the experiment.
+// the motor is also enabled
+// the EEPROM values are no longer valid
 
 void enable_isr()
 {
-  unsigned long t_half_stp = 0; // time that a half of a step takes
+  unsigned t_half_stp = 0; // time that a half of a step takes
 
-  t_half_ustp = ((byte)vec_t_h_ustp[vel_mmh]);
+  t_half_ustp = round(vec_t_h_ustp[vel_mmh]);
+
+  digitalWrite(X_ENABLE_PIN , ENABLE_MOTOR);
+
+  // EEPROM data is not going to be valid if it is powered off from now
+  EEPROM.put(EEP_AD_VALID, EEP_INVALID_DATA);
 
   // interrupt for the linear position sensor
   attachInterrupt(digitalPinToInterrupt(LPS_ENC1_PIN),
@@ -1602,8 +1989,8 @@ void enable_isr()
   Timer3.initialize(1000000);   // A million microseconds to count seconds
 
 
-  if (t_half_ustp == 200) { // slow speed
-    t_half_stp = ((unsigned long)(vec_t_h_stp[vel_mmh]));
+  if (t_half_ustp == SLEW_VEL_T_H_USTP) { // slow speed
+    t_half_stp = round(vec_t_h_stp[vel_mmh]);
 
     // attach function for half micro steps interruption
     Timer1.attachInterrupt(h_ustp_slow_isr);
@@ -1635,28 +2022,27 @@ void loop() {
       rot_enc_pushed = rot_encoder_pushed();
       if (rot_enc_pushed == true) { 
         // get the EEPROM value (only once)
-        check_pos_x_eeprom();
+        check_eeprom();
         task_menu();
         ui_state = ST_SEL_TASK;
       }
       break;
-    case ST_SEL_TASK: // Choosing between going home or moving distance
+    case ST_SEL_TASK:
+      // Choosing between going home, moving distance, or info last experiment
       rot_enc_pushed = rot_encoder_pushed();
       if (rot_enc_pushed == true) { // select parameters
-        param_menu();
-        ui_state = ST_SEL_PARAMS;
+        if (task_st == TASK_LAST_INFO) {
+          last_info_menu();
+          ui_state = ST_LAST_INFO;
+        } else {
+          selparam_st = SELPARAM_VEL; // start selecting speed
+          param_menu();
+          ui_state = ST_SEL_PARAMS;
+        }
       } else {
         read_rot_encoder_dir();
-        if (rot_enc_rght == true || rot_enc_left == true) {
-          // only 2, so the other
-          if (task_st == TASK_HOME) {
-            task_st = TASK_MOVE_REL;
-          } else {
-            task_st = TASK_HOME;
-          }
-          selparam_st = SELPARAM_VEL; // start selecting speed
-          update_task_menu();
-        }
+        task_st = nxt_task(task_st, rot_enc_rght, rot_enc_left);
+        update_task_menu();
       }
       break;
     case ST_SEL_PARAMS: // Selecting speed, distance (if not homing) & go back
@@ -1722,19 +2108,19 @@ void loop() {
               break;
             case SELPARAM_DIST: // changing the destination
               if (seldigit_st == SELDIG_SIGN) {
-                rel_dist_neg = ! rel_dist_neg;
+                is_dist_dest_neg = ! is_dist_dest_neg;
               } else {
-                aux_val = rel_dist + val_incr;
+                aux_val = dist_dest_magn + val_incr;
                 if (aux_val > TOT_LEN) {
-                  rel_dist = TOT_LEN;
+                  dist_dest_magn = TOT_LEN;
                 } else {
-                  rel_dist = aux_val;
+                  dist_dest_magn = aux_val;
                 }
-                if (rel_dist_neg) {
-                  rel_dist_sign = - rel_dist;
-                } else {
-                  rel_dist_sign = rel_dist;
-                }
+              }
+              if (is_dist_dest_neg) {
+                dist_dest_wsign = - dist_dest_magn;
+              } else {
+                dist_dest_wsign = dist_dest_magn;
               }
               break;
             default: // would be an error to be here
@@ -1752,14 +2138,19 @@ void loop() {
               break;
             case SELPARAM_DIST: // changing the destination
               if (seldigit_st == SELDIG_SIGN) {
-                rel_dist_neg = ! rel_dist_neg;
+                is_dist_dest_neg = ! is_dist_dest_neg;
               } else {
-                aux_val = rel_dist + val_incr;
+                aux_val = dist_dest_magn + val_incr;
                 if (aux_val < 1) {
-                  rel_dist = 1;  // no 0 distance
+                  dist_dest_magn = 1;  // no 0 distance
                 } else {
-                  rel_dist = aux_val;
+                  dist_dest_magn = aux_val;
                 }
+              }
+              if (is_dist_dest_neg) {
+                dist_dest_wsign = - dist_dest_magn;
+              } else {
+                dist_dest_wsign = dist_dest_magn;
               }
               break;
             default: // would be an error to be here
@@ -1776,11 +2167,11 @@ void loop() {
           if (task_st == TASK_HOME) {
             ui_state = ST_HOMING;
             homing_screen();
+            is_dist_dest_neg = true; // when homing, distance is negative
           } else {
             ui_state = ST_RUN;
-            runrel_screen();
+            run_dist_screen();
           }
-          digitalWrite(X_ENABLE_PIN , LOW);  // Stepper motor enable. Active-low
           enable_isr(); // enable interrupts for the experiment
         } else {
           ui_state = ST_SEL_PARAMS;
@@ -1803,24 +2194,24 @@ void loop() {
       homing();
       ui_state = ST_END;
       break;
-
     case ST_RUN: 
-      running_rel();
+      run_distance();
       ui_state = ST_END;
       break;    
-    case ST_END:
-      digitalWrite(X_ENABLE_PIN , HIGH); // Stepper motor disable. Active-low
+    case ST_LAST_INFO:
       rot_enc_pushed = rot_encoder_pushed();
-        if (rot_enc_pushed == true) { // confirmation or go back
-          ui_state = ST_INI;
-          lcd.createChar(CHR_HL_DIAM, IC_HL_DIAM); // 0: hollow diamond
-          lcd.createChar(CHR_FL_DIAM, IC_FL_DIAM); // 1: full diamond
-          lcd.clear();
-        }
+      if (rot_enc_pushed == true) { // confirmation or go back
+        ui_state = ST_SEL_TASK;
+        task_menu();
+      }
+      break;
+    case ST_END:
+      rot_enc_pushed = rot_encoder_pushed();
+      if (rot_enc_pushed == true) { // confirmation or go back
+        ui_state = ST_INI;
+        lcd.clear();
+        init_screen();
+      }
       break;
   }
-  
 }
-
-          
-  

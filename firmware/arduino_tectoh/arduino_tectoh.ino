@@ -1324,6 +1324,7 @@ void h_ustp_fast_isr() {
     h_ustp_cnt_loc ++;
   }
   //first time, it was 0 until the interruption comes
+  // even numbers it will be LOW, odds number it will be HIGH
   digitalWrite(X_STEP_PIN , bitRead(h_ustp_cnt_loc,0));
 
 
@@ -1361,7 +1362,6 @@ void h_ustp_slow_isr() {
     //first time, it was 0, for the interval
     digitalWrite(X_STEP_PIN, bitRead(h_ustp_cnt,0));
   }
-
 
   /* another option
   static byte step_value = LOW; // signal to send to stepper motor pin
@@ -1967,9 +1967,9 @@ void disable_isr()
 
 void enable_isr()
 {
-  unsigned long t_half_stp = 0; // time that a half of a step takes
+  unsigned t_half_stp = 0; // time that a half of a step takes
 
-  t_half_ustp = ((byte)vec_t_h_ustp[vel_mmh]);
+  t_half_ustp = round(vec_t_h_ustp[vel_mmh]);
 
   digitalWrite(X_ENABLE_PIN , ENABLE_MOTOR);
 
@@ -1986,7 +1986,7 @@ void enable_isr()
 
 
   if (t_half_ustp == SLEW_VEL_T_H_USTP) { // slow speed
-    t_half_stp = ((unsigned long)(vec_t_h_stp[vel_mmh]));
+    t_half_stp = round(vec_t_h_stp[vel_mmh]);
 
     // attach function for half micro steps interruption
     Timer1.attachInterrupt(h_ustp_slow_isr);
@@ -2112,11 +2112,11 @@ void loop() {
                 } else {
                   dist_dest_magn = aux_val;
                 }
-                if (is_dist_dest_neg) {
-                  dist_dest_wsign = - dist_dest_magn;
-                } else {
-                  dist_dest_wsign = dist_dest_magn;
-                }
+              }
+              if (is_dist_dest_neg) {
+                dist_dest_wsign = - dist_dest_magn;
+              } else {
+                dist_dest_wsign = dist_dest_magn;
               }
               break;
             default: // would be an error to be here
@@ -2142,6 +2142,11 @@ void loop() {
                 } else {
                   dist_dest_magn = aux_val;
                 }
+              }
+              if (is_dist_dest_neg) {
+                dist_dest_wsign = - dist_dest_magn;
+              } else {
+                dist_dest_wsign = dist_dest_magn;
               }
               break;
             default: // would be an error to be here

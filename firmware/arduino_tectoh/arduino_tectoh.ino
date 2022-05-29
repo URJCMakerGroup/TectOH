@@ -119,7 +119,8 @@ const int HSTEP_REV = 2 * STEP_REV; // halfsteps per revolution
 const float GEAR_R = 51.0f; // gear ratio of the motor
 
 //advance in mm per halfstep  3 / (400 * 51) = 0.000 147
-const float ADVAN_HSTEP = float(LEAD) / (HSTEP_REV * GEAR_R);
+//const float ADVAN_HSTEP = float(LEAD) / (HSTEP_REV * GEAR_R);
+const float ADVAN_HSTEP = 0.000147;
 
 // ---- variables for keeping track the experiment timing
 
@@ -1091,17 +1092,19 @@ void run_distance() {
     if (hstp_cnt_copy != hstp_cnt_prev) {
       lcd.setCursor(4, 2);
       traveled_mm_hs_f = ADVAN_HSTEP * hstp_cnt_copy;
-      traveled_mm_hs = round(traveled_mm_hs_f);
+      // cannot be rounded, but floor, because it has to reach it
+      traveled_mm_hs = floor(traveled_mm_hs_f); // cann
       lcdprint_rght(traveled_mm_hs,3);
-      lcd.setCursor(12, 2);
-      lcd.print(hstp_cnt_copy);
+      //lcd.setCursor(12, 2);
+      //lcd.print(hstp_cnt_copy);
       hstp_cnt_prev = hstp_cnt_copy;
     }
 
     if (lps_line_cnt_copy != lps_line_cnt_prev) {
       lcd.setCursor(4, 3);
       traveled_mm_lin_f = mm_per_lps_line * lps_line_cnt_copy;
-      traveled_mm_lin = round(traveled_mm_lin_f);
+      // cannot be rounded, but floor, because it has to reach it
+      traveled_mm_lin = floor(traveled_mm_lin_f);
       lcdprint_rght_sign(traveled_mm_lin,3);
       lcd.setCursor(12, 3);
       lcd.print(lps_line_cnt_copy);
@@ -1238,17 +1241,19 @@ void homing() {
     if (hstp_cnt_copy != hstp_cnt_prev) {
       lcd.setCursor(4, 2);
       traveled_mm_hs_f = ADVAN_HSTEP * hstp_cnt_copy;
-      traveled_mm_hs = round(traveled_mm_hs_f);
+      // cannot be rounded, but floor, because it has to reach it
+      traveled_mm_hs = floor(traveled_mm_hs_f);
       lcdprint_rght(traveled_mm_hs,3);
-      lcd.setCursor(12, 2);
-      lcd.print(hstp_cnt_copy);
+      //lcd.setCursor(12, 2);  // too much info to print
+      //lcd.print(hstp_cnt_copy);
       hstp_cnt_prev = hstp_cnt_copy;
     }
 
     if (lps_line_cnt_copy != lps_line_cnt_prev) {
       lcd.setCursor(4, 3);
       traveled_mm_lin_f = mm_per_lps_line * lps_line_cnt_copy;
-      traveled_mm_lin = round(traveled_mm_lin_f);
+      // cannot be rounded, but floor, because it has to reach it
+      traveled_mm_lin = floor(traveled_mm_lin_f);
       lcdprint_rght_sign(traveled_mm_lin,3);
       lcd.setCursor(12, 3);
       lcd.print(lps_line_cnt_copy);

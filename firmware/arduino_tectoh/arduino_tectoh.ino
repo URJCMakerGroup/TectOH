@@ -718,10 +718,9 @@ void lcdprint_val_err(int number, byte eeprom_valid_read_arg, int max_digit)
 void lcdprint_rght (int number, int max_digit)
 {
   int index = 0;
-  
   int max_number;
 
-  max_number = int(pow(10, max_digit-1));
+  max_number = round(pow(10, max_digit-1));
 
   //lcd.setCursor(col, row);
   for (index = 0; index < max_digit-1; index++) {

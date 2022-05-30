@@ -207,7 +207,12 @@ byte  mins_eep_read     =  0;  // 10
 short hours_eep_read     =  0; // 11,12
 short dist_hs_eep_read   =  0; // 13,14 positive
 short dist_line_eep_read =  0; // 15,16 pos o neg
-short hs_cnt_eep_read    =  0; // 17,18,19,20
+// Number of half steps counted. a long has 32 bits -> being unsigned
+// from 0 to 4,294,967,295
+// 400 mm, with 3mm lead, 400 halfsteps per turn and 51 reduction,
+// gives 0,147 um/halfstep, which is 
+//               2,714,666.67 halfsteps (22 bits) So we can count them
+unsigned long  hs_cnt_eep_read    =  0; // 17,18,19,20
 short line_cnt_eep_read  =  0; // 21,22 pos o neg
 byte estop_ini_eep_read = 0; //23 taken from the same address
 byte estop_end_eep_read = 0; //23
@@ -779,6 +784,29 @@ void lcdprint_rght_sign (int number, byte max_digit)
   lcd.print(number_positive);
 }
 
+// -------------- lcdprint_errsymbol
+// print an error symbol:
+//   - right arrow: EEP_VALID_DATA  
+//   - ?:           EEP_INVALID_DATA
+//   - back E:      EEP_ERR_STOP
+
+void lcdprint_errsymbol (byte eeprom_valid_read_arg)
+{
+  switch (eeprom_valid_read_arg) {
+    case EEP_VALID_DATA:
+      lcd.write(CHR_RGHT_ARROW); // ok
+      break;
+    case EEP_INVALID_DATA:
+      lcd.print("?"); // data from the eeprom is not valid
+      break;
+    case EEP_ESTOP_ERR:
+      lcd.write(CHR_ERR_ESTOP); // there is an error with the position and endstop
+      break;
+  }
+}
+// lcdprint_errsymbol
+
+
 // -------------- lcdprint_errcode
 // print an integer in the lcd aligned to the right
 // number: number to print
@@ -1015,7 +1043,7 @@ void run_dist_screen()
   row = 2;
   lcd.setCursor(0, row);
          //  0123456
-  lcd.print("dS= ");
+  lcd.print("ds= ");
   // no need to print sign, it will be printed with the number
   //if (is_dist_dest_neg == true) {
   //  lcd.print("-");
@@ -1032,7 +1060,7 @@ void run_dist_screen()
   lcd.setCursor(0, row);
 
          //  01234567
-  lcd.print("dL= ");
+  lcd.print("dl= ");
   // no need to print sign, it will be printed with the number
   //if (is_dist_dest_neg == true) {
   //  lcd.print("-");
@@ -1188,7 +1216,7 @@ void homing_screen()
   row = 2;
   lcd.setCursor(0, row);
          //  0123456
-  lcd.print("dS=-  0");
+  lcd.print("ds=-  0");
   lcd.write(CHR_MM);
            //8901
   lcd.print("|hs=");
@@ -1198,7 +1226,7 @@ void homing_screen()
   lcd.setCursor(0, row);
 
          //  01234567
-  lcd.print("dL=   0");
+  lcd.print("dl=   0");
   lcd.write(CHR_MM);
 
   lcd.print("|lin=    0");
@@ -1312,7 +1340,6 @@ void second_cnt_isr() {
     sec_cnt ++;
   }
 }
-
 
 // -------------- Interrupt function to count the microsteps and generate
 // ------ the pulses for the motor
@@ -1522,7 +1549,7 @@ void task_menu()
   lcd.print("Move distance");
 
   lcd.setCursor(1, 2);
-  lcd.print("Info last experimen");
+  lcd.print("Info LastExperiment");
 
   lcd.setCursor(LCD_EEP_POS_COL, 3);
   lcd.print("|x:");
@@ -1877,7 +1904,6 @@ void update_confirm_menu ()
 
 void last_info_menu()
 {
-
   byte row = 0;
 
   lcd.createChar(CHR_X0, IC_X0); //
@@ -1887,13 +1913,20 @@ void last_info_menu()
   // -- row 0 
   row = 0;
   lcd.setCursor(0, row);
-  lcdprint_errcode(eeprom_valid_read);
+  lcdprint_errsymbol(eeprom_valid_read);
+
+  lcd.print("v");
+  lcdprint_rght(vel_eep_read,3);
+  lcd.write(CHR_MM);
+  lcd.write(CHR_PER_HOUR);
+
+  lcd.print(" ");
   lcd.write(CHR_XF);
   lcd.print("=");
   lcdprint_errcode(pos_act_eep_read,3);
   lcd.write(CHR_MM);
 
-  lcd.print("|");
+  lcd.print(" ");
   lcd.write(byte(CHR_X0));
   lcd.print("=");
   lcdprint_errcode(pos_prev_eep_read,3);
@@ -1902,10 +1935,9 @@ void last_info_menu()
   // -- row 1 
   row = 1;
   lcd.setCursor(0, row);
-  lcd.print("v=");
-  lcdprint_rght(vel_eep_read,3);
+  lcd.print("d=");
+  lcdprint_rght_sign(dist_eep_read,3);
   lcd.write(CHR_MM);
-  lcd.write(CHR_PER_HOUR);
 
            //7890123456789
   lcd.print("  ");
@@ -1919,11 +1951,11 @@ void last_info_menu()
   // -- row 2 steps
   row = 2;
   lcd.setCursor(0, row);
-         //  0123456
-  lcd.print("d=");
-  lcdprint_rght_sign(dist_eep_read,3);
-  lcd.write(CHR_MM);
 
+  lcd.print("ds=");
+  lcdprint_rght_sign(dist_hs_eep_read,3);
+
+  lcd.write(CHR_MM);
   lcd.print(" hs=");
   lcd.print(hs_cnt_eep_read);
 
@@ -1931,16 +1963,13 @@ void last_info_menu()
   row = 3;
   lcd.setCursor(0, row);
          //  01234567
-  lcd.print("dS=");
-  lcdprint_rght(dist_hs_eep_read,3);
-  lcd.write(CHR_MM);
 
-  lcd.print(" dL=");
+  lcd.print("dl=");
   lcdprint_rght_sign(dist_line_eep_read,3);
   lcd.write(CHR_MM);
 
-
-
+  lcd.print(" ln=");
+  lcd.print(lps_line_cnt);
 
 
   // EEPROM endstop print

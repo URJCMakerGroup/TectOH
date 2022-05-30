@@ -69,7 +69,7 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
 #define X_ENABLE_PIN 38     // ENABLE pin for the first stepper motor driver (axis X)
 
 // defined in configuration file: tectoh_config.h
-#if DIR_MOTOR_POSIT_HIGH
+#if DIR_MOTOR_POSITIVE_HIGH
   #define DIR_MOTOR_POS HIGH
   #define DIR_MOTOR_NEG LOW
 #else
@@ -85,6 +85,13 @@ LiquidCrystal lcd(LCD_PINS_RS, LCD_PINS_ENABLE,
   #define DISABLE_MOTOR LOW
 #endif
 
+#if LCD_STOP_BTN_ACTIVE_HIGH
+  #define STOP_BTN_ON   HIGH
+  #define STOP_BTN_OFF  LOW
+#else
+  #define STOP_BTN_ON   LOW
+  #define STOP_BTN_OFF  HIGH
+#endif
 
 // ------------ Linear position sensor LPS
   
@@ -109,7 +116,7 @@ byte estop_end;    // endstop value at the end
   #define ESTOP_OFF HIGH
 #endif
 
-const int TOT_LEN = 400;    // leadscrew length in mm, maximum distance
+const int TOT_LEN = 270;    // leadscrew length in mm, maximum distance
 const int MAX_VEL = 100;    // maximum velocity in mm/h
 
 const int LEAD = 3;  // lead screw lead in mm. How many mm advances per revolution
@@ -118,7 +125,7 @@ const int HSTEP_REV = 2 * STEP_REV; // halfsteps per revolution
 
 const float GEAR_R = 51.0f; // gear ratio of the motor
 
-//advance in mm per halfstep  3 / (400 * 51) = 0.000 147
+//advance in mm per halfstep  3 / (270 * 51) = 0.000 147
 //const float ADVAN_HSTEP = float(LEAD) / (HSTEP_REV * GEAR_R);
 const float ADVAN_HSTEP = 0.000147;
 
@@ -1138,8 +1145,6 @@ void run_distance() {
 } // run_distance()
 
 
-
-
 // ---------------- homing screen
 
 void homing_screen()
@@ -1440,6 +1445,8 @@ void save2eeprom()
 
   traveled_mm_hs = 0;
   traveled_mm_lin = 0;
+
+  lps_line_cnt = 0;
 
   sec_cnt = 0;
   minute_cnt = 0;

@@ -1,10 +1,9 @@
 // Endstops:
 
-#define ESTOP_ACTIVE_HIGH true // Set to false to invert the logic of the endstop
-
+#define ESTOP_ACTIVE_HIGH true // Set to false to invert the logic of the pushbutton
 
 // kill/stop button of the LCD
-#define LCD_STOP_BTN_ACTIVE_HIGH  true  // Set to false to invert the logic of the pushbutton
+#define LCD_STOP_BTN_ACTIVE_HIGH  false // Set to true to have direct logic
 
 
 // Pin X_DIR_PIN determines the rotation direction of the stepper.

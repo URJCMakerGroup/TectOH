@@ -97,7 +97,7 @@ architecture RTL of INTERF_SSI_AS5133 is
   constant c_cnt_ssiclk     : natural := div_redondea
                                            (c_period_ns_ssi,c_period_ns_fpga); 
   -- the number of bits (nb) necesary to represent c_cnt_ssiclk
-  constant c_nb_cnt_ssiclk : natural := log2i(c_cnt_ssiclk) + 1;
+  constant nb_cnt_ssiclk : natural := log2i(c_cnt_ssiclk) + 1;
 
   -- number of cycles to count for the 1st falling edge of the SSI clk
   --  50
@@ -112,7 +112,7 @@ architecture RTL of INTERF_SSI_AS5133 is
   signal ssi_data_rg     :  std_logic; -- serial data from the AS5133 SSI
 
   -- counter for the frequency divider for the SSI receiver
-  signal cnt_ssiclk       : unsigned (c_nb_cnt_ssiclk-1 downto 0);
+  signal cnt_ssiclk       : unsigned (nb_cnt_ssiclk-1 downto 0);
   -- combinatorial signal that indicates the end of the count for the frequency
   -- divider for the SSI receiver
   signal end_cnt_ssiclk   : std_logic;
@@ -123,7 +123,7 @@ architecture RTL of INTERF_SSI_AS5133 is
   signal cnt_ssiclk_2ndhalf_rg : std_logic;
 
   -- this is the count of the bits received from the SSI (nb: number of bits)
-  signal cnt_ssi_bits       : unsigned (c_nb_ssi_bits-1 downto 0);
+  signal cnt_ssi_bits       : unsigned (nb_ssi_bits-1 downto 0);
   signal end_cnt_ssibits    : std_logic;
 
   type   recep_states is (IDLE, PREPARE_RECEP, RECEIVING_BITS,

@@ -27,10 +27,7 @@ package PKG_AS5133 is
   --                          div_redondea (c_fpga_freq_clk, c_ssi_freq);
   
   -- the number of bits (nb) necesary to represent c_cnt_ssiclk
-  --constant c_nb_cnt_ssiclk : natural := log2i(c_cnt_ssiclk) + 1;
-
-  -- depending on the FPGA buttons
-  constant c_rst_on        : std_logic := c_btn_on;
+  --constant nb_cnt_ssiclk : natural := log2i(c_cnt_ssiclk) + 1;
 
   -- number of bits for the data: either the position or the magnetic field
   constant c_data_bits       : natural := 12;   
@@ -48,7 +45,12 @@ package PKG_AS5133 is
   -- 12 + 6 = 18, but not considering the parity bit: 17
   constant c_ssi_bits        : natural := c_data_bits + c_status_bits - 1;
   -- this is the number of bits we need to represent c_ssi_bits
-  constant c_nb_ssi_bits     : natural := log2i(c_ssi_bits) + 1; 
+  constant nb_ssi_bits     : natural := log2i(c_ssi_bits) + 1; 
+
+  -- The number of bits for range of the milimiter count. It is not going to
+  -- be larger than 127 mm, includes the negative part so the zero can be
+  -- modified.
+  constant  nb_cnt_mm      : natural := 8;
   
 
 end PKG_AS5133;

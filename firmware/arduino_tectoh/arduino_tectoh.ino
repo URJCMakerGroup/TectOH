@@ -484,6 +484,8 @@ void setup() {
   
   pinMode(ESTOP_INI_PIN, INPUT_PULLUP);   // Endstop init position
   pinMode(ESTOP_END_PIN, INPUT_PULLUP);   // Endstop final position
+
+  pinMode(LCD_STOP_PIN, INPUT_PULLUP);   // Stop/kill button of the LCD
  
   pinMode (LPS_ENC1_PIN, INPUT);     // linear position sensor quadrature encoder 1
   pinMode (LPS_ENC2_PIN, INPUT);     // linear position sensor quadrature encoder 2
@@ -971,7 +973,25 @@ bool endstop_hit_vel ()
     }
   }
   return false;
-}
+} //endstop_hit_vel
+
+
+
+// --------- stop_btn_pushed
+// -- reads the value of the stop/kill button of the LCD and if it is pulsed
+// -- returns true
+
+bool stop_btn_pushed ()
+{
+  byte stop_btn;
+  stop_btn = digitalRead(LCD_STOP_PIN);
+
+  if (stop_btn == STOP_BTN_ON) {
+    return true;
+  } else {
+    return false;
+  }
+} //stop_btn_pushed
 
 // ------ ST_INI: initial state
 
@@ -1113,8 +1133,10 @@ void run_distance() {
   // we will be running the experiment provided that:
   // - the traveled distance is less than the total distance
   // - we haven't hit the endstop on the direction we are moving
+  // - if the stop/kill button has not been pushed
   while ((traveled_mm_hs < dist_dest_magn) &&
-          !endstop_hit_vel())  {
+          !endstop_hit_vel() &&
+          !stop_btn_pushed())  {
 
     // disable interrupts to make a copy to avoid corruption
     // for seconds minutes is not necessary because they are byte
@@ -1261,7 +1283,9 @@ void homing() {
   byte          minute_cnt_prev   = 0;
   short         hour_cnt_prev     = 0;
 
-  while (estop_ini == ESTOP_OFF) {
+  // estop_ini has been checked, and it is checked at the end of the while
+  while ( estop_ini == ESTOP_OFF &&
+         !stop_btn_pushed()) {
 
     // disable interrupts to make a copy to avoid corruption
     // for seconds minutes is not necessary because they are byte

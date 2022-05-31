@@ -97,6 +97,9 @@ architecture RTL of INTERF_SSI_AS5133 is
   constant c_cnt_ssiclk     : natural := div_redondea
                                            (c_period_ns_ssi,c_period_ns_fpga); 
   -- the number of bits (nb) necesary to represent c_cnt_ssiclk
+  -- I think it should be minus 1, check, because to count 256 I need
+  -- 8 bits, not 9.
+  --constant nb_cnt_ssiclk : natural := log2i(c_cnt_ssiclk-1) + 1;
   constant nb_cnt_ssiclk : natural := log2i(c_cnt_ssiclk) + 1;
 
   -- number of cycles to count for the 1st falling edge of the SSI clk

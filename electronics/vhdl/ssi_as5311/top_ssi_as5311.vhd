@@ -19,16 +19,19 @@ entity TOP_SSI_AS5133 is
     clk             : in  std_logic;
     sw              : in  std_logic_vector(c_sw-1 downto 0);
     -- push buttons
-    --btnu             : in  std_logic;
-    --btnd            : in  std_logic;
-    --btnr             : in  std_logic;
-    --btnl             : in  std_logic;
+    btnu            : in  std_logic;
+    btnd            : in  std_logic;
+    btnr            : in  std_logic;
+    btnl            : in  std_logic;
     btnc            : in  std_logic;
     -- LEDS
     led             : out std_logic_vector(c_leds-1 downto 0);
     -- 7 segments
     d7an_sel        : out std_logic_vector(c_7seg_units-1 downto 0);
     d7cat_seg       : out std_logic_vector(c_7seg_seg-1 downto 0);
+    --en_n_stp        : out std_logic;
+    dir_stp         : out std_logic;
+    step_stp        : out std_logic;
     -- AS5133 SSI
     ssi_data_in     : in  std_logic; -- SSI data from AS5133
     ssi_cs_n_out    : out std_logic; -- chip select
@@ -97,6 +100,30 @@ architecture STRUCT of TOP_SSI_AS5133 is
       read_ssi        : out std_logic
     );
   end component;
+  
+  component RISINGEDGE_DETECT is
+    port(
+      rst             : in  std_logic;
+      clk             : in  std_logic;
+      btn             : in  std_logic_vector (c_btn-1 downto 0);
+      btn_filter      : out std_logic_vector (c_btn-1 downto 0)
+    );
+  end component;
+
+  component STEPPER_CONTROL is
+    port(
+      rst             : in  std_logic;
+      clk             : in  std_logic;
+      stp_fwd         : in  std_logic;
+      stp_bck         : in  std_logic;
+      stp_16fwd       : in  std_logic;
+      stp_16bck       : in  std_logic;
+      --en_n_stp        : out std_logic;
+      dir_stp         : out std_logic;
+      step_stp        : out std_logic
+    );
+  end component;
+
 
   constant c_dot_v     : std_logic_vector := "00000000";
   constant c_bcd_zero  : std_logic_vector(nb_bcd-1 downto 0) := (others =>'0');
@@ -115,8 +142,28 @@ architecture STRUCT of TOP_SSI_AS5133 is
   signal   read_ssi    : std_logic;
   signal   pos_fieldn  : std_logic;
 
+  signal   btn_in      : std_logic_vector(c_btn-1 downto 0);
+  signal   btn_filter  : std_logic_vector(c_btn-1 downto 0);
+  -- filtered push buttons
+  signal   btnc_f      : std_logic;
+  signal   btnu_f      : std_logic;
+  signal   btnl_f      : std_logic;
+  signal   btnr_f      : std_logic;
+  signal   btnd_f      : std_logic;
 
 begin
+
+  btn_in (0)  <= btnc;
+  btn_in (1)  <= btnu;
+  btn_in (2)  <= btnl;
+  btn_in (3)  <= btnr;
+  btn_in (4)  <= btnd;
+
+  btnc_f   <= btn_filter(0);
+  btnu_f   <= btn_filter(1);
+  btnl_f   <= btn_filter(2);
+  btnr_f   <= btn_filter(3);
+  btnd_f   <= btn_filter(4);
 
   led(0) <= parity_ok;
   led (c_status_bits downto 1) <= status_interf_ssi;
@@ -147,7 +194,7 @@ begin
       -- signals from/to FPGA
       rst             => rst,
       clk             => clk,
-      init_milim      => btnc,  -- central push button to initialize
+      init_milim      => btnc_f,  -- central push button to initialize
       pos_fieldn_in   => sw(0),
       cnt_milim_out   => cnt_milim,
       pos_data_out    => pos_data,
@@ -178,6 +225,28 @@ begin
       ssi_data_in     => ssi_data_in,
       ssi_cs_n_out    => ssi_cs_n_out,
       ssi_clk_out     => ssi_clk_out
+    );
+
+  I_RISINGEDGE_DETECT: RISINGEDGE_DETECT 
+    port map (
+      rst             => rst,
+      clk             => clk,
+      btn             => btn_in,
+      btn_filter      => btn_filter
+    );
+
+
+  I_STEPPER_CONTROL: STEPPER_CONTROL 
+    port map(
+      rst             => rst,
+      clk             => clk,
+      stp_fwd         => btnr_f,
+      stp_bck         => btnl_f,
+      stp_16fwd       => btnu_f,
+      stp_16bck       => btnd_f,
+      --en_n_stp        : out std_logic;
+      dir_stp         => dir_stp,
+      step_stp        => step_stp
     );
 
 end STRUCT;

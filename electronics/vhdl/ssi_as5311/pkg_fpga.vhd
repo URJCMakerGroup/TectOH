@@ -51,6 +51,9 @@ package PKG_FPGA is
   -- number of LEDs
   constant c_leds            : natural := 16;  -- Nexys 4
 
+  -- number of push buttons  
+  constant c_btn             : natural := 5; -- Nexys 4 Not counting the reset 
+
   -- el periodo del reloj en ns (pero de tipo natural)
   -- luego lo tendremos que multiplicar por un nanosegundo
   --constant c_fpga_period_ns_clk : natural := 10**9/c_fpga_freq_clk;

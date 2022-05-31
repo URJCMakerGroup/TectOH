@@ -183,6 +183,9 @@ begin
     wait until ssi_cs_n = '1';
     wait for t_do_tristate;
     index := index + 1;
+    if index = status_data'length -1 then
+      wait;
+    end if;
   end process;
 
 end BEHAV;

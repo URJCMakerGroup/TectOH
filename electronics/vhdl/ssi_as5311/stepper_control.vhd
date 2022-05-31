@@ -62,16 +62,16 @@ architecture RTL of STEPPER_CONTROL is
                                           (c_period_stp, c_period_ns_fpga);
   constant nb_cnt_stp         : natural := log2i(c_cnt_stp-1)+1;
 
-  constant c_cnt_half_stp     : natural := c_cnt_stp;
+  constant c_cnt_half_stp     : natural := c_cnt_stp/2;
 
   signal   cnt_stp            : unsigned (nb_cnt_stp-1 downto 0);
 
   signal   end_cnt_stp        : std_logic;
   signal   half_cnt_stp       : std_logic;
   signal   active_st           : std_logic;
-  signal   s_setup            : std_logic;
-  signal   start_moving       : std_logic;
-  signal   start_hold         : std_logic;
+--  signal   s_setup            : std_logic;
+--  signal   start_moving       : std_logic;
+--  signal   start_hold         : std_logic;
   signal   moving16           : std_logic;
   signal   moving1            : std_logic;
   signal   end_moving         : std_logic;
@@ -172,9 +172,9 @@ begin
           stp_fwd_rg <= '0';
         elsif stp_bck_rg = '1' and end_cnt_stp = '1' then
           stp_bck_rg <= '0';
-        elsif stp_16fwd_rg = '1' and end_cnt_16stp = '1' then
+        elsif stp_16fwd_rg = '1' and end_cnt_16stp_pls = '1' then
           stp_16fwd_rg <= '0';
-        elsif stp_16bck_rg = '1' and end_cnt_16stp = '1' then
+        elsif stp_16bck_rg = '1' and end_cnt_16stp_pls = '1' then
           stp_16bck_rg <= '0';
         end if;
       else   -- idle, check if there is any command
@@ -197,7 +197,7 @@ begin
   moving1  <= stp_fwd_rg   OR stp_bck_rg;
   moving16 <= stp_16fwd_rg OR stp_16bck_rg;
 
-  end_moving <= (moving1 AND end_cnt_stp) OR (moving16 AND end_cnt_16stp);
+  end_moving <= (moving1 AND end_cnt_stp) OR (moving16 AND end_cnt_16stp_pls);
 
   P_setup_cnt: Process (rst, clk)
   begin
@@ -265,7 +265,7 @@ begin
     elsif clk'event and clk = '1' then
       if mov_pres_st = MOVING_ST then
         if end_cnt_stp = '1' then
-          if (end_cnt_16stp = '1') then
+          if (end_cnt_16stp = '1') then  -- equivalent to end_cnt_16stp_pls
             cnt_16stp <= (others => '0');
           else
             cnt_16stp <= cnt_16stp + 1;
@@ -291,6 +291,8 @@ begin
         step_stp <= '1'; -- to start on
       elsif mov_pres_st = MOVING_ST then
         if half_cnt_stp = '1' then
+          step_stp <= '0';
+        elsif end_moving = '1' then
           step_stp <= '0';
         elsif end_cnt_stp = '1' then
           step_stp <= '1';

@@ -35,16 +35,19 @@ architecture TB of TB_TOP_SSI_AS5133 is
       clk             : in  std_logic;
       sw              : in  std_logic_vector(c_sw-1 downto 0);
       -- push buttons
-      --btnu             : in  std_logic;
-      --btnd            : in  std_logic;
-      --btnr             : in  std_logic;
-      --btnl             : in  std_logic;
+      btnu            : in  std_logic;
+      btnd            : in  std_logic;
+      btnr            : in  std_logic;
+      btnl            : in  std_logic;
       btnc            : in  std_logic;
       -- LEDS
       led             : out std_logic_vector(c_leds-1 downto 0);
       -- 7 segments
       d7an_sel        : out std_logic_vector(c_7seg_units-1 downto 0);
       d7cat_seg       : out std_logic_vector(c_7seg_seg-1 downto 0);
+      --en_n_stp        : out std_logic;
+      dir_stp         : out std_logic;
+      step_stp        : out std_logic;
       -- AS5133 SSI
       ssi_data_in     : in  std_logic; -- SSI data from AS5133
       ssi_cs_n_out    : out std_logic; -- chip select
@@ -66,11 +69,18 @@ architecture TB of TB_TOP_SSI_AS5133 is
   signal    clk               : std_logic;
   signal    sw                : std_logic_vector(c_sw-1 downto 0);
   signal    btnc              : std_logic;
+
+  signal    btnu              : std_logic;  -- 16f
+  signal    btnd              : std_logic;  -- 16b
+  signal    btnr              : std_logic;  -- 1 step forward
+  signal    btnl              : std_logic;  -- 1 step back
   -- signals to be read and be checked
   signal    led               : std_logic_vector(c_leds-1 downto 0);
   signal    d7an_sel          : std_logic_vector(c_7seg_units-1 downto 0);
   signal    d7cat_seg         : std_logic_vector(c_7seg_seg-1 downto 0);
 
+  signal    dir_stp           : std_logic;
+  signal    step_stp          : std_logic;
 
   -- signals between SSI_AS5133 and INTERF_SSI_AS5133
   signal    ssi_cs_n          : std_logic;
@@ -98,10 +108,16 @@ begin
       clk             => clk,
       sw              => sw, -- sw(0) pos_fieldn_in
       --btnd            => btnd, 
+      btnu            => btnu,  -- 16 steps forward
+      btnd            => btnd,  -- 16 steps back
+      btnr            => btnr,  -- 1 step forward
+      btnl            => btnl,  -- 1 step back
       btnc            => btnc,  -- init_milim
       led             => led,
       d7an_sel        => d7an_sel,
       d7cat_seg       => d7cat_seg,
+      dir_stp         => dir_stp,
+      step_stp        => step_stp,
       -- Signals to/from AS5133 SSI 
       ssi_data_in     => ssi_data,
       ssi_cs_n_out    => ssi_cs_n,
@@ -131,10 +147,74 @@ begin
     wait;
   end process;
 
+
+  ------- process to generate the signals for control
+  P_gen_control: Process
+  begin
+    wait until rst = c_rst_on;
+    btnu <= '0'; 
+    btnd <= '0'; 
+    btnr <= '0'; 
+    btnl <= '0'; 
+    sw(0) <= '0'; --position_fieldn <= position;
+    wait until rst = NOT c_rst_on;
+    for i in 0 to 5 loop
+      wait until clk = '1';
+    end loop;
+    wait for 7 ns;
+    btnu <= '1'; 
+    btnd <= '0'; 
+    btnr <= '0'; 
+    btnl <= '0'; 
+    wait for 500 ns;
+    btnu <= '0'; 
+    btnd <= '1'; 
+    btnr <= '0'; 
+    btnl <= '0'; 
+    wait for 500 ns;
+    btnu <= '0'; 
+    btnd <= '0'; 
+    btnr <= '1'; 
+    btnl <= '0'; 
+    wait for 500 ns;
+    btnu <= '0'; 
+    btnd <= '0'; 
+    btnr <= '0'; 
+    btnl <= '1'; 
+    wait for 500 ns;
+    btnu <= '1'; 
+    btnd <= '0'; 
+    btnr <= '0'; 
+    btnl <= '1'; 
+    wait for 500 ns;
+    btnu <= '0'; 
+    btnd <= '0'; 
+    btnr <= '0'; 
+    btnl <= '0'; 
+    wait for 1 ms;
+    btnu <= '1'; 
+    btnd <= '1'; 
+    btnr <= '0'; 
+    btnl <= '0'; 
+    wait for 3 ms;
+    btnu <= '0'; 
+    btnd <= '0'; 
+    btnr <= '1'; 
+    btnl <= '1'; 
+    wait for 3 ms;
+    btnu <= '0'; 
+    btnd <= '1'; 
+    btnr <= '0'; 
+    btnl <= '0'; 
+    wait;
+  end process;
+
+
   ------- process to generate the signals for the SSI interface
   P_gen_ssi_cmd: Process
     --variable position : std_logic := '0';
   begin
+    btnc <= '0';  -- init_milim
     wait until rst = c_rst_on;
     btnc <= '0';  -- init_milim
     sw(0) <= '0'; --position_fieldn <= position;

@@ -29,7 +29,7 @@ entity TOP_SSI_AS5133 is
     -- 7 segments
     d7an_sel        : out std_logic_vector(c_7seg_units-1 downto 0);
     d7cat_seg       : out std_logic_vector(c_7seg_seg-1 downto 0);
-    --en_n_stp        : out std_logic;
+    en_n_stp        : out std_logic;
     dir_stp         : out std_logic;
     step_stp        : out std_logic;
     -- AS5133 SSI
@@ -170,6 +170,8 @@ begin
   led (c_leds-1 downto c_status_bits +1) <= (others => NOT c_led_on);
  
   en_bcd   <= "11111111";
+
+  en_n_stp <= sw(1); -- enable of the motor. '0' is active
 
   I_DISP7SEG_8UNIT: DISP7SEG_8UNIT
     port map (

@@ -51,6 +51,9 @@ architecture RTL of RISINGEDGE_DETECT is
   -- Having a counter for each will be:
   --   a count of 25500000 will be 25 bits for each one: 25xN. => 125
   constant c_period_cnt1     : natural := 1000000;   -- 1 ms in ns
+  -- For simulation, to shorten the time, coment this in synthesis
+  --constant c_period_cnt1     : natural := 100;   -- 1 ms in ns
+
   constant c_cnt1            : natural := div_redondea 
                                           (c_period_cnt1, c_period_ns_fpga);
   constant nb_cnt1           : natural := log2i(c_cnt1-1) + 1;

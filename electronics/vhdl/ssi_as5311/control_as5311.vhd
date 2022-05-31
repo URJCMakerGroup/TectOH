@@ -78,6 +78,7 @@ entity CONTROL_AS5133 is
     data_ready      : in  std_logic;
     parity_ok       : in  std_logic;
     data_ssi        : in  std_logic_vector(c_data_bits-1 downto 0);
+    -- NOT USED HERE SO FAR
     status_ssi      : in  std_logic_vector(c_status_bits-1 downto 0);
     pos_fieldn_2ssi : out std_logic;
     read_ssi        : out std_logic

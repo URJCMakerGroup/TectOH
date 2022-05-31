@@ -56,6 +56,7 @@ architecture RTL of STEPPER_CONTROL is
   signal   stp_16bck_rg        : std_logic;
 
   -- period of the motor, if done continously, it will define the speed
+  -- the minimun period for the Allegro A4988 is 2us, 2000 ns
   constant c_period_stp       : natural := 100000;  -- 1 ms, in ns
 
   constant c_cnt_stp          : natural := div_redondea
@@ -69,9 +70,6 @@ architecture RTL of STEPPER_CONTROL is
   signal   end_cnt_stp        : std_logic;
   signal   half_cnt_stp       : std_logic;
   signal   active_st           : std_logic;
---  signal   s_setup            : std_logic;
---  signal   start_moving       : std_logic;
---  signal   start_hold         : std_logic;
   signal   moving16           : std_logic;
   signal   moving1            : std_logic;
   signal   end_moving         : std_logic;
@@ -83,7 +81,7 @@ architecture RTL of STEPPER_CONTROL is
 
   constant c_cnt_setup        : natural := div_redondea
                                            (c_setup_time, c_period_ns_fpga);
-  constant c_cnt_hold                  : natural := div_redondea
+  constant c_cnt_hold         : natural := div_redondea
                                            (c_hold_time, c_period_ns_fpga);
   constant nb_cnt_setup       : natural := log2i(c_cnt_setup-1)+1;
   constant nb_cnt_hold        : natural := log2i(c_cnt_hold-1)+1;
@@ -106,6 +104,8 @@ architecture RTL of STEPPER_CONTROL is
 
 begin
 
+  -- State Machine, sequential part, that includes the setup and hold times.
+  -- for the Allegro A4988
   P_SEQ_FSM_MOV: Process (rst, clk) 
   begin 
     if rst = c_rst_on then 
@@ -115,6 +115,7 @@ begin
     end if; 
   end process; 
 
+  -- State Machine, combinational part, that includes the setup and hold times.
   P_COMB_FSM_MOV: Process (mov_pres_st, mov_next_st, stp_fwd, stp_bck, 
                            stp_16fwd, stp_16bck, end_cnt_setup, end_moving,
                            end_cnt_hold)
@@ -158,6 +159,8 @@ begin
     end case;
   end process;           
 
+  -- process that registers the commands for the motor, and maintains these
+  -- commands until the steps are done
   P_Reg: Process (rst, clk)
   begin
     if rst = c_rst_on then
@@ -199,6 +202,7 @@ begin
 
   end_moving <= (moving1 AND end_cnt_stp) OR (moving16 AND end_cnt_16stp_pls);
 
+  -- Count for the setup time of the Allegro A4988
   P_setup_cnt: Process (rst, clk)
   begin
     if rst = c_rst_on then
@@ -218,6 +222,7 @@ begin
 
   end_cnt_setup <= '1' when cnt_setup = c_cnt_setup -1 else '0';
  
+  -- Count for the hold time of the Allegro A4988
   P_hold_cnt: Process (rst, clk)
   begin
     if rst = c_rst_on then
@@ -238,6 +243,7 @@ begin
   end_cnt_hold <= '1' when cnt_hold = c_cnt_hold -1 else '0';
  
 
+  -- count for the step period for the Allegro A4988
   P_period_stp_count: Process (rst, clk)
   begin
     if rst = c_rst_on then

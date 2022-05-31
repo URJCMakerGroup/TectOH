@@ -78,10 +78,10 @@ entity CONTROL_AS5133 is
     data_ready      : in  std_logic;
     parity_ok       : in  std_logic;
     data_ssi        : in  std_logic_vector(c_data_bits-1 downto 0);
-    -- NOT USED HERE SO FAR
+
     status_ssi      : in  std_logic_vector(c_status_bits-1 downto 0);
     pos_fieldn_2ssi : out std_logic;
-    read_ssi        : out std_logic
+    read_ssi        : out std_logic -- command to make a new reading
   );
 end CONTROL_AS5133;
 
@@ -104,9 +104,47 @@ architecture RTL of CONTROL_AS5133 is
   signal    pos_fieldn_rg    : std_logic;
   signal    valid_pos_ssi_rg : std_logic;
 
+  -- we have to read the sensor after it has sent the data.
+  -- the maximum clock frequency for the sensor is defined by the period
+  -- c_period_ns_ssi, which is 1us 1MHz. The sensor would take around 20 times
+  -- to send it. So, around 20us 50kHz. Which is much more than we need because
+  -- we have such slow speeds.
+  -- So we have changed the period c_period_ns_ssi to 10us 100kHz -> 200us 5kHz
+  -- and we are going to sample each 250us 4kHz. So we have plenty of time to
+  -- receive it, and we sample 4 times every millisecond. Since the motor takes
+  -- around 5 ms to make a half step (6.4ms in our case with microstepping)
+  -- we are taking 20 samples in that halfstep, which it seems enough
+  constant c_period_readsensor  : natural := 250000; -- ns -> 250us each sample
+  constant c_cnt_readsensor     : natural := div_redondea
+                                           (c_period_readsensor,c_period_ns_fpga); 
+  constant nb_cnt_readsensor    : natural := log2i(c_cnt_readsensor) + 1;
+
+  -- counter for the sensor reading period
+  signal cnt_readsensor         : unsigned (nb_cnt_readsensor-1 downto 0);
+  signal end_cnt_readsensor     : std_logic;
+
 begin
 
-  -- Process that continously ask for new data to the SSI
+
+  -- process that counts the sensor reading period
+  p_cnt_readsensor: Process(rst, clk)
+  begin
+    if rst = c_rst_on then
+      cnt_readsensor <= (others => '0');
+    elsif clk'event and clk = '1' then
+      if end_cnt_readsensor = '1' then
+        cnt_readsensor <= (others => '0');
+      else 
+        cnt_readsensor <= cnt_readsensor + 1;
+      end if;
+    end if;
+  end process;
+     
+  end_cnt_readsensor <= '1' when (cnt_readsensor = c_cnt_readsensor - 1) else
+                        '0';
+
+
+  -- Process that ask for new data to the SSI
   P_SSI_CONTROL: Process (rst, clk)
   begin
     if rst = c_rst_on then
@@ -115,7 +153,7 @@ begin
     elsif clk'event and clk = '1' then
       read_ssi_aux <= '0';
       -- ask for a new data, just a clock cycle
-      if ssi_avail = '1' AND read_ssi_aux = '0' then  
+      if end_cnt_readsensor = '1' then  
         read_ssi_aux <= '1';
         -- to keep the value of pos_fieldn that was asked 
         pos_fieldn_rg <= pos_fieldn_in;
@@ -123,8 +161,8 @@ begin
     end if;
   end process;
 
+  -- new read
   read_ssi <= read_ssi_aux;
-
   pos_fieldn_2ssi <= pos_fieldn_rg;
 
   cnt_milim_out <= std_logic_vector(cnt_milim);

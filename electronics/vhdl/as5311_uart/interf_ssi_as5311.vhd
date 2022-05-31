@@ -87,10 +87,14 @@ architecture RTL of INTERF_SSI_AS5133 is
   -- cnt: count. The end of count to get the frequency
   --constant c_cnt_ssi      : natural := c_freq_fpga/c_freq_ssi;
 
-  constant c_period_ns_ssi     : natural := 1000;   --ns
+  -- it could be as low as 1000ns (1us 1 MHz), but since our system is so slow
+  -- we are going to make it 10us 100kHz, so the transmission will be safer 
+  --constant c_period_ns_ssi     : natural := 1000;   --ns
+  constant c_period_ns_ssi     : natural := 10000;   --ns
   --constant c_period_ns_fpga    : natural := 10;     --ns 
   -- time of first Falling Edge of ssiclk after cs_n is active (1st FE of cs_n) 
-  constant c_ssiclk_ns_fe      : natural := 500;     --ns
+  --constant c_ssiclk_ns_fe      : natural := 500;     --ns
+  constant c_ssiclk_ns_fe      : natural := c_period_ns_ssi/2;     --ns
   -- number of cycles to count each cycle of the SSI clk -- 100
   -- we don't substract 1, we will do it when we calculate the end of the count
   -- so we avoid doing the divisions wrong, like c_cnt_ssiclk_fe

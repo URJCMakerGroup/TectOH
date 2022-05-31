@@ -35,7 +35,9 @@ entity TOP_SSI_AS5133 is
     -- AS5133 SSI
     ssi_data_in     : in  std_logic; -- SSI data from AS5133
     ssi_cs_n_out    : out std_logic; -- chip select
-    ssi_clk_out     : out std_logic  -- clk for the SSI
+    ssi_clk_out     : out std_logic; -- clk for the SSI
+    -- UART
+    uart_tx         : out std_logic  -- data to the computer
   );
 end TOP_SSI_AS5133;
 
@@ -121,6 +123,22 @@ architecture STRUCT of TOP_SSI_AS5133 is
       --en_n_stp        : out std_logic;
       dir_stp         : out std_logic;
       step_stp        : out std_logic
+    );
+  end component;
+
+
+  component uart_tx_nopar is
+    generic (
+      gFrecClk      : integer := 100000000;   --100MHz
+      gBaud         : integer := 115200 --9600bps 921600
+    ); 
+    port(
+      rst           : in std_logic; 
+      clk           : in std_logic;
+      Transmite     : in std_logic;
+      DatoTxIn      : in std_logic_vector (7 downto 0);    
+      Transmitiendo : out std_logic;
+      DatoSerieOut  : out std_logic
     );
   end component;
 
@@ -250,6 +268,21 @@ begin
       dir_stp         => dir_stp,
       step_stp        => step_stp
     );
+
+  I_UART_TX: UART_TX_NOPAR
+    generic map (
+      gFrecClk      =>  100000000,   --100MHz
+      gBaud         =>  115200
+    )
+    port map (
+      rst             => rst,
+      clk             => clk,
+      Transmite       => data_ready,
+      DatoTxIn        => data_interf_ssi(7 downto 0), --only LSB
+      --Transmitiendo 
+      DatoSerieOut    => uart_tx
+    );
+
 
 end STRUCT;
   

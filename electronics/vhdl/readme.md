@@ -17,7 +17,7 @@ The SSI clock is provided by the FPGA. The maximum frequency is 1MHz (T=1us). Si
 
 Since we don't need such high rates due to the low speed of the Sandbox, we use a frequency of 100kHz (T=10us). So it is safer to send through the cables. This leads to a message frequency of 5kHz (200 us per message).
 
-We even lower the *message frequency to 4kHz* (250 us per message). Therefore, **each sample is taken every 250 us**. 4000 samples per second.
+We even lower the **message frequency to 4kHz** (250 us per message). Therefore, **each sample is taken every 250 us**. 4000 samples per second.
 
 The Sanbox has a 3mm lead, a 200 pole stepper motor, a 50.9 gear reduction, and the motor moves using halfsteps (HS). This makes that the gantry advances 147 nm per halfstep.
 
@@ -54,6 +54,11 @@ Leds show the status bits of the AS5311
 - led(3) : LIN
 - led(4) : COF
 - led(5) : OC
+
+7 segment displays
+- Display 2 down to 0: position data from the AS5311. It is 12 bit, so 4 bits each display. Hexadecimal.
+- Display 4 down to 3: millimiters distance in Hex. 8 bit. There is overlap with the 12 bit position data, because the position data divides 2mm in 12 bits. So the MSB should be the same as the millimeters unit.
+- Displays 7 down to 5: Field data of the sensor
 
 I/O not used in this test, this is when the motor is controlled by the FPGA
 - btn_r (right): a step forward

@@ -15,10 +15,10 @@ data = list(range(len(raw)))
 for x in range(len(raw)):
     data[x] = raw[x]
     
-print("Samples read " + len(data))
+print("Samples read " + str(len(data)))
 
 arr_data = np.array(data, dtype=int)
-unwrap_data = np.unwrap(arr_data, discont=125) # Works fine?
+unwrap_data = np.unwrap(arr_data, discont=127) # Works fine?
 
 plt.plot(time, unwrap_data)
 plt.xlabel('Samples')

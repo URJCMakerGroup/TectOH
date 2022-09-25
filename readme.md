@@ -1,5 +1,10 @@
 # Tectonic Open Hardware (TectOH) Sandbox
 
+
+## User Guide
+
+[Sandbox User Guide](./user_guide)
+
 ## Firmware
 [Arduino code of the Sandbox](./firmware)
 

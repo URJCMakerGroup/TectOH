@@ -3,8 +3,6 @@
 
 # ## Magnetic Encoder Analysis
 
-# In[1]:
-
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -16,21 +14,13 @@ DIR = "./files/"
 
 # ### Select File by uncommenting
 
-# In[2]:
-
-
 data_filename = "capture_10_1.bin"
 data_filename = "capture_25_1.bin"
-#data_filename = "capture_50_1.bin"
-#data_filename = "capture_82_1.bin"
+data_filename = "capture_50_1.bin"
+data_filename = "capture_82_1.bin"
 #data_filename = "capture_100_1.bin"
 
 data_fulfilename = DIR + data_filename
-
-
-# Analysis
-
-# In[3]:
 
 
 with open(data_fulfilename,"rb") as f:
@@ -42,15 +32,11 @@ data = []
 numdata = len(raw)
 print("Number of samples", numdata)
 
-
-# In[7]:
-
-
 for data_i in range(numdata):
     data.append(raw[data_i])
     
 # do the median filter
-window = 81
+window = 61
 # take window an odd value, same number of data in each side
 if window % 2 == 0:
     window + 1
@@ -69,12 +55,17 @@ time = [] # although we are filtering, it is ok to start at zero
 primer = 1
 base = 0 # will increase or decrease if the data goes above 255 or below 0
 
+# each increment is 2 mm/4096 -> 0.488 um
+um_incr = 2000/4096
 
-BACK = 8000
+# distance to go back to see the trend
+BACK = 6000
 
+# for debuging any index
 DBG_INDX = 129788*4
+DBG = False # set true to print for debug
 
-for index, data_i in enumerate(data):
+for index in range(len(data)):
     # example window=9, side_window=4
     #         numdata=20 (0 to 19)
     # when the index is 4 or larger, it has 4 data on the left: 0,1,2,3
@@ -94,10 +85,10 @@ for index, data_i in enumerate(data):
         base_ceil  = base_floor + 256 
         # check if some elements of data_window has gone out of boundaries
         adjust_data_window = []
-        if index == DBG_INDX:
+        if index == DBG_INDX and DBG:
             print(data_window)
         if max(data_window) - min(data_window) > 200:
-            if index == DBG_INDX:
+            if index == DBG_INDX and DBG:
                 print(max(data_window))
                 print (np.median(data[back_index-side_window:back_index+side_window+1]))
             # it means that it has overflow
@@ -109,11 +100,11 @@ for index, data_i in enumerate(data):
                     else:
                         adjust_data_window.append(base_floor + datawin_i)
                 if primer == 1:
-                    print(datawin)
+                    print(datawin_i)
                     print(base_ceil)
                     print(base_floor)
                     primer = 0
-                if index == DBG_INDX:
+                if index == DBG_INDX and DBG:
                     print(adjust_data_window)
                     print(base_ceil)
                     print(base_floor)
@@ -127,26 +118,37 @@ for index, data_i in enumerate(data):
                     else:
                         adjust_data_window.append(base_floor + datawin_i)
                 base = base_floor-256 # the next base will be floor
-                if index == DBG_INDX:
+                if index == DBG_INDX and DBG:
                     print(adjust_data_window)
                     print(base_ceil)
                     print(base_floor)
         else: # no overflow
             for datawin_i in data_window:
-                adjust_data_window.append(base + datawin_i) # here base is used
+                if median_data: # if not empty (not the first data to attach
+                    # check the last data, it should be similar, sometimes
+                    # there is a 256 error with the previous, when the previous
+                    # median window has overflow, but not this, but base has 
+                    # been changed
+                    base_datawin_i = base + datawin_i
+                    if median_data[-1] - base_datawin_i > 100: # there is error with base 
+                        base = base + 256
+                        base_datawin_i = base + datawin_i
+                    elif base_datawin_i - median_data[-1] > 100: # there is error with base 
+                        base = base - 256
+                        base_datawin_i = base + datawin_i
+                    adjust_data_window.append(base_datawin_i)
+                else:
+                    adjust_data_window.append(base + datawin_i)
+                 
               
         orig_data.append(data[index])
         median_data.append(int(np.median(adjust_data_window)))
-        if index == DBG_INDX:
+        if index == DBG_INDX and DBG:
             print(median_data[-1])
         mean_data.append(round(np.mean(adjust_data_window),1))
         mean_data_int.append(int(round(np.mean(adjust_data_window),0)))
 
         time.append(0.25 * (index-side_window))
-        # double 
-        if primer==1:
-            #print(data_window)
-            primer = 0
 
 side2_window = int(side_window/2)
 median2_data = []

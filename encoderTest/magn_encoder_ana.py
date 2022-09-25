@@ -89,13 +89,23 @@ for index, data_i in enumerate(data):
             #print(data_window)
             primer = 0
 
+side2_window = int(side_window/2)
+median2_data = []
+for index, data_i in enumerate(median_data):
+    if index >= side2_window and index < numdata-side2_window:
+        data_window = median_data[index-side2_window:index+side2_window+1]
+        median2_data.append(int(np.median(data_window)))
+    else:
+        median2_data.append(data_i)
+    
 
             
 plt.figure(figsize=(16,16))
-plt.plot(time, orig_data, linewidth=0.5, color='b')
+plt.plot(time, median2_data, linewidth = 3, color='k')
+plt.plot(time, orig_data, linewidth=0.5, color='b', linestyle='dotted')
 plt.plot(time, median_data, color='r')
 plt.plot(time, mean_data, color='g')
-plt.plot(time, mean_data_int, color='m', linewidth = 1)
+plt.plot(time, mean_data_int, color='m', linewidth = 1, linestyle='dotted')
 plt.xlabel('Time')
 plt.ylabel('Position (??)')
 plt.show()

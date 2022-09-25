@@ -16,8 +16,8 @@ DIR = "./files/"
 
 data_filename = "capture_10_1.bin"
 data_filename = "capture_25_1.bin"
-data_filename = "capture_50_1.bin"
-data_filename = "capture_82_1.bin"
+#data_filename = "capture_50_1.bin"
+#data_filename = "capture_82_1.bin"
 #data_filename = "capture_100_1.bin"
 
 data_fulfilename = DIR + data_filename
@@ -99,7 +99,7 @@ for index in range(len(data)):
                         adjust_data_window.append(base_ceil + datawin_i)
                     else:
                         adjust_data_window.append(base_floor + datawin_i)
-                if primer == 1:
+                if primer == 1 and DBG:
                     print(datawin_i)
                     print(base_ceil)
                     print(base_floor)
@@ -148,8 +148,17 @@ for index in range(len(data)):
         mean_data.append(round(np.mean(adjust_data_window),1))
         mean_data_int.append(int(round(np.mean(adjust_data_window),0)))
 
+        # each sample is 0.25 ms
         time.append(0.25 * (index-side_window))
 
+# get the minimum vale of all, so have them at zero
+min_val = min([min(median_data), min(mean_data_int), int(min(mean_data))])
+for index in range(len(median_data)):
+    median_data[index] = median_data[index] - min_val 
+    mean_data[index] = mean_data[index] - min_val 
+    mean_data_int[index] = mean_data_int[index] - min_val 
+
+# second mean filter
 side2_window = int(side_window/2)
 median2_data = []
 trend = [] 
@@ -160,6 +169,13 @@ for index, data_i in enumerate(median_data):
     else:
         median2_data.append(data_i)
       
+# and now to have it in micrometer
+for index in range(len(median_data)):
+    median_data[index]   = median_data[index]   * um_incr
+    median2_data[index]  = median2_data[index]  * um_incr
+    mean_data[index]     = mean_data[index]     * um_incr
+    mean_data_int[index] = mean_data_int[index] * um_incr
+
     
 
             
@@ -169,23 +185,11 @@ plt.plot(time, orig_data, linewidth=0.5, color='b', linestyle='dotted')
 plt.plot(time, median_data, color='r')
 plt.plot(time, mean_data, color='g')
 #plt.plot(time, mean_data_int, color='m', linewidth = 1, linestyle='dotted')
-plt.xlabel('Time')
-plt.ylabel('Position (??)')
+plt.xlabel('Time (ms)')
+plt.ylabel('Position (um)')
 plt.show()
 
             
-#median_data
-
-
-# In[5]:
-
-
-lista = [0,1,2,3,4,5,6,7,8,9]
-lista[0:2]
-
-
-# In[ ]:
-
 
 
 

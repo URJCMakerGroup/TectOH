@@ -3,6 +3,7 @@
 
 # ## Magnetic Encoder Analysis
 
+import pathlib
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -15,7 +16,7 @@ DIR = "./files/"
 # ### Select File by uncommenting
 
 data_filename = "capture_10_1.bin"
-data_filename = "capture_25_1.bin"
+#data_filename = "capture_25_1.bin"
 #data_filename = "capture_50_1.bin"
 #data_filename = "capture_82_1.bin"
 #data_filename = "capture_100_1.bin"
@@ -64,6 +65,7 @@ BACK = 6000
 # for debuging any index
 DBG_INDX = 129788*4
 DBG = False # set true to print for debug
+
 
 for index in range(len(data)):
     # example window=9, side_window=4
@@ -171,25 +173,41 @@ for index, data_i in enumerate(median_data):
       
 # and now to have it in micrometer
 for index in range(len(median_data)):
-    median_data[index]   = median_data[index]   * um_incr
-    median2_data[index]  = median2_data[index]  * um_incr
-    mean_data[index]     = mean_data[index]     * um_incr
-    mean_data_int[index] = mean_data_int[index] * um_incr
-
+    median_data[index]   = round(median_data[index]   * um_incr,1)
+    median2_data[index]  = round(median2_data[index]  * um_incr,1)
+    mean_data[index]     = round(mean_data[index]     * um_incr,1)
+    mean_data_int[index] = round(mean_data_int[index] * um_incr,1)
     
+# ------------- Save to csv
 
-            
-plt.figure(figsize=(16,16))
-plt.plot(time, median2_data, linewidth = 3, color='k')
-plt.plot(time, orig_data, linewidth=0.5, color='b', linestyle='dotted')
-plt.plot(time, median_data, color='r')
-plt.plot(time, mean_data, color='g')
-#plt.plot(time, mean_data_int, color='m', linewidth = 1, linestyle='dotted')
+base_filename = pathlib.Path(data_filename).stem
+csv_filename = DIR + base_filename + '.csv'
+with open(csv_filename, 'w') as csv_file:
+
+    csv_file.write('index,time,median2,median1,mean,mean int,original\n')
+    for index in range(len(median_data)):
+        csv_file.write(str(index) + ',')
+        csv_file.write(str(time[index]) + ',')
+        csv_file.write(str(median2_data[index]) + ',')
+        csv_file.write(str(median_data[index]) + ',')
+        csv_file.write(str(mean_data[index]) + ',')
+        csv_file.write(str(mean_data_int[index]) + ',')
+        csv_file.write(str(orig_data[index]) + '\n')
+
+# ------------- draw plots
+
+fig, ax = plt.subplots()
+ax.plot(time, median2_data, linewidth = 3, color='k', label='median 2')
+ax.plot(time, orig_data, linewidth=0.5, color='b', linestyle='dotted', label='original data')
+ax.plot(time, median_data, color='r', label= 'median 1')
+ax.plot(time, mean_data, color='g', label = 'mean')
+#ax.plot(time, mean_data_int, color='m', linewidth = 1, linestyle='dotted', label = 'mean integer')
+ax.set_xlim(left=0)
+ax.set_ylim(bottom=0)
+ax.set(yticks=np.arange(0,2000,20))
+ax.grid(True)
+ax.legend()
 plt.xlabel('Time (ms)')
 plt.ylabel('Position (um)')
 plt.show()
-
-            
-
-
 

@@ -171,13 +171,18 @@ for index, data_i in enumerate(median_data):
     else:
         median2_data.append(data_i)
       
+max_value = 0
 # and now to have it in micrometer
 for index in range(len(median_data)):
     median_data[index]   = round(median_data[index]   * um_incr,1)
     median2_data[index]  = round(median2_data[index]  * um_incr,1)
     mean_data[index]     = round(mean_data[index]     * um_incr,1)
     mean_data_int[index] = round(mean_data_int[index] * um_incr,1)
-    
+    if median_data[index] > max_value:
+        max_value = median_data[index]
+
+max_value = max_value + (20 - max_value % 20)
+
 # ------------- Save to csv
 
 base_filename = pathlib.Path(data_filename).stem
@@ -196,6 +201,7 @@ with open(csv_filename, 'w') as csv_file:
 
 # ------------- draw plots
 
+
 fig, ax = plt.subplots()
 ax.plot(time, median2_data, linewidth = 3, color='k', label='median 2')
 ax.plot(time, orig_data, linewidth=0.5, color='b', linestyle='dotted', label='original data')
@@ -203,8 +209,8 @@ ax.plot(time, median_data, color='r', label= 'median 1')
 ax.plot(time, mean_data, color='g', label = 'mean')
 #ax.plot(time, mean_data_int, color='m', linewidth = 1, linestyle='dotted', label = 'mean integer')
 ax.set_xlim(left=0)
-ax.set_ylim(bottom=0)
-ax.set(yticks=np.arange(0,2000,20))
+ax.set_ylim(bottom=0, top=max_value)
+ax.set(yticks=np.arange(0,max_value,20))
 ax.grid(True)
 ax.legend()
 plt.xlabel('Time (ms)')

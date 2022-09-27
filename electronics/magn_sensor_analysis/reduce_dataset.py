@@ -107,7 +107,7 @@ red_mean      = []
 red_mean_int  = []
 red_orig_data = []
 
-csvres_filename = csv_filename + '_red.csv'
+csvres_filename = DIR + csv_filename + '_red.csv'
 with open(csvres_filename, 'w') as csv_file:
 
     csv_file.write('index,time,median2,median1,mean,mean int,original\n')

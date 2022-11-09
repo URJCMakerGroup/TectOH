@@ -18,11 +18,30 @@ DIR = "./files/"
 
 # ### Select File by uncommenting
 
-csv_filename = "capture_10_1"
+# ------------- Select File by uncommenting (extension .csv not included)
+
+# --- September 2022 experiments
+#csv_filename = "capture_10_1"
 #csv_filename = "capture_25_1"
 #csv_filename = "capture_50_1"
 #csv_filename = "capture_82_1"
 #csv_filename = "capture_100_1"
+
+# --- November 2022 experiments
+#csv_filename = "mov_100mmh_1_to_10_fallo"
+#csv_filename = "mov_100mmh_1_to_20"
+#csv_filename = "mov_25mmh_10_to_20_cont_50"
+#csv_filename = "mov_25mmh_1_to_5"
+#csv_filename = "mov_25mmh_cont_50"
+csv_filename = "mov_75mmh_1_to_20"
+
+if csv_filename.startswith("mov"):
+    # november experiment
+    DIR = "./files_nov/"
+else:
+    # september experiment
+    DIR = "./files/"
+
 
 csv_fulfilename = DIR + csv_filename + '.csv'
 

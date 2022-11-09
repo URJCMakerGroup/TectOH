@@ -11,7 +11,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # directory where the csv files are
-DIR = "./files/"
+#DIR = "./files/"
+DIR = "./files_nov/"
 
 # ow.walk [2] are filenames
 dir_list = next(os.walk(DIR))[2]

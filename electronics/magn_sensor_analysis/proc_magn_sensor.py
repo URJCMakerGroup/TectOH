@@ -37,7 +37,7 @@ plot_graph = False
 
 # cuts:
 
-#data_filename = "exp5kg_25mmh_5mm_0_763s.bin"
+data_filename = "exp5kg_25mmh_5mm_0_763s.bin"
 #data_filename = "exp5kg_25mmh_10mm_800_2250s.bin"
 #data_filename = "exp5kg_25mmh_20mm_2700_5620s.bin"
 #data_filename = "exp5kg_25mmh_50mm_5620_12247s.bin"
@@ -49,7 +49,7 @@ plot_graph = False
 
 #data_filename = "exp5kg_100mmh_5mm_0_255s.bin"
 #data_filename = "exp5kg_100mmh_10mm_255_625s.bin"
-data_filename = "exp5kg_100mmh_20mm_663_1400s.bin"
+#data_filename = "exp5kg_100mmh_20mm_663_1400s.bin"
 #data_filename = "exp5kg_100mmh_50mm_1488_3300s.bin"
 
 
@@ -97,7 +97,6 @@ mean_data_int = []
 time = [] # although we are filtering, it is ok to start at zero
 
 primer = 1
-base = 0 # will increase or decrease if the data goes above 255 or below 0
 
 # each increment is 2 mm/4096 -> 0.488 um
 um_incr = 2/4.096
@@ -160,7 +159,7 @@ for index in range(len(data)):
                     print(base_ceil)
                     print(base_floor)
 
-                base = base_ceil # the next base will be ceil
+                base_floor = base_ceil # the next base will be ceil
                 
             else: # going down
                 if data[index] < 127: # low number means it is ok
@@ -173,7 +172,7 @@ for index in range(len(data)):
                         adjust_data_window.append(base_floor - 256 + datawin_i)
                     else:
                         adjust_data_window.append(base_floor + datawin_i)
-                base = base_floor-256 # the next base will be floor
+                base_floor = base_floor-256 # the next base will be floor-256
                 if index == DBG_INDX and DBG:
                     print(adjust_data_window)
                     print(base_ceil)
@@ -185,16 +184,16 @@ for index in range(len(data)):
                     # there is a 256 error with the previous, when the previous
                     # median window has overflow, but not this, but base has 
                     # been changed
-                    base_datawin_i = base + datawin_i
+                    base_datawin_i = base_floor + datawin_i
                     if median_data[-1] - base_datawin_i > 100: # there is error with base 
-                        base = base + 256
-                        base_datawin_i = base + datawin_i
+                        base_floor = base_floor + 256
+                        base_datawin_i = base_floor + datawin_i
                     elif base_datawin_i - median_data[-1] > 100: # there is error with base 
-                        base = base - 256
-                        base_datawin_i = base + datawin_i
+                        base_floor = base_floor - 256
+                        base_datawin_i = base_floor + datawin_i
                     adjust_data_window.append(base_datawin_i)
                 else:
-                    adjust_data_window.append(base + datawin_i)
+                    adjust_data_window.append(base_floor + datawin_i)
                  
             orig_base_data.append(base_floor + data[index])
               

@@ -9,6 +9,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
 
+# set to True or False if you want to have the results plotted
+plot_graph = False
+# plot_graph = True
+
 # ------------- Select File by uncommenting
 
 # --- September 2022 experiments
@@ -24,11 +28,37 @@ from scipy import signal
 #data_filename = "mov_25mmh_10_to_20_cont_50.bin"
 #data_filename = "mov_25mmh_1_to_5.bin"
 #data_filename = "mov_25mmh_cont_50.bin"
-data_filename = "mov_75mmh_1_to_20.bin"
+#data_filename = "mov_75mmh_1_to_20.bin"
+
+# --- November 2022 good experiments
+#data_filename = "exp5kg_25mmh.bin"
+#data_filename = "exp5kg_75mmh.bin"
+#data_filename = "exp5kg_100mmh.bin"
+
+# cuts:
+
+#data_filename = "exp5kg_25mmh_5mm_0_763s.bin"
+#data_filename = "exp5kg_25mmh_10mm_800_2250s.bin"
+#data_filename = "exp5kg_25mmh_20mm_2700_5620s.bin"
+#data_filename = "exp5kg_25mmh_50mm_5620_12247s.bin"
+
+#data_filename = "exp5kg_75mmh_5mm_0_288s.bin"
+#data_filename = "exp5kg_75mmh_10mm_288_875s.bin"
+#data_filename = "exp5kg_75mmh_20mm_875_1900s.bin"
+#data_filename = "exp5kg_75mmh_50mm_2063_4500s.bin"
+
+#data_filename = "exp5kg_100mmh_5mm_0_255s.bin"
+#data_filename = "exp5kg_100mmh_10mm_255_625s.bin"
+data_filename = "exp5kg_100mmh_20mm_663_1400s.bin"
+#data_filename = "exp5kg_100mmh_50mm_1488_3300s.bin"
+
 
 if data_filename.startswith("mov"):
-    # november experiment
+    # november experiment wrong experiment
     DIR = "./files_nov/"
+elif data_filename.startswith("exp5kg"):
+    # november experiment good experiment
+    DIR = "./files_nov2/"
 else:
     # september experiment
     DIR = "./files/"
@@ -49,7 +79,7 @@ for data_i in range(numdata):
     data.append(raw[data_i])
     
 # do the median filter
-window = 61
+window = 65 # to have 32 in each side
 # take window an odd value, same number of data in each side
 if window % 2 == 0:
     window + 1
@@ -60,6 +90,7 @@ side_window = int(window/2)
 #print(side_window) # the pixels at each side
 
 orig_data = [] 
+orig_base_data = [] 
 median_data = []
 mean_data = []
 mean_data_int = []
@@ -69,7 +100,7 @@ primer = 1
 base = 0 # will increase or decrease if the data goes above 255 or below 0
 
 # each increment is 2 mm/4096 -> 0.488 um
-um_incr = 2000/4096
+um_incr = 2/4.096
 
 # distance to go back to see the trend
 BACK = 6000
@@ -101,13 +132,19 @@ for index in range(len(data)):
         adjust_data_window = []
         if index == DBG_INDX and DBG:
             print(data_window)
-        if max(data_window) - min(data_window) > 200:
+        if max(data_window) - min(data_window) > 200: # a lot of difference, we are changing
+            # it means that it has overflow
             if index == DBG_INDX and DBG:
                 print(max(data_window))
                 print (np.median(data[back_index-side_window:back_index+side_window+1]))
-            # it means that it has overflow
+
             if np.median(data[back_index-side_window:back_index+side_window+1]) > 127:
                 # we are going up
+                if data[index] < 127: # a low number means, overflow, add the ceil
+                    orig_base_data.append(base_ceil + data[index])
+                else:
+                    orig_base_data.append(base_floor + data[index])
+
                 for datawin_i in data_window:
                     if datawin_i < 127:
                         adjust_data_window.append(base_ceil + datawin_i)
@@ -126,6 +163,11 @@ for index in range(len(data)):
                 base = base_ceil # the next base will be ceil
                 
             else: # going down
+                if data[index] < 127: # low number means it is ok
+                    orig_base_data.append(base_floor + data[index])
+                else:# a high number means, underflow, add the ceil
+                    orig_base_data.append(base_floor -256 + data[index])
+
                 for datawin_i in data_window:
                     if datawin_i > 127:
                         adjust_data_window.append(base_floor - 256 + datawin_i)
@@ -154,6 +196,7 @@ for index in range(len(data)):
                 else:
                     adjust_data_window.append(base + datawin_i)
                  
+            orig_base_data.append(base_floor + data[index])
               
         orig_data.append(data[index])
         median_data.append(int(np.median(adjust_data_window)))
@@ -166,11 +209,12 @@ for index in range(len(data)):
         time.append(0.25 * (index-side_window))
 
 # get the minimum vale of all, so have them at zero
-min_val = min([min(median_data), min(mean_data_int), int(min(mean_data))])
+min_val = min([min(median_data), min(mean_data_int), int(min(mean_data)), min(orig_base_data)])
 for index in range(len(median_data)):
     median_data[index] = median_data[index] - min_val 
     mean_data[index] = mean_data[index] - min_val 
     mean_data_int[index] = mean_data_int[index] - min_val 
+    orig_base_data[index] = orig_base_data[index] - min_val 
 
 # second mean filter
 side2_window = int(side_window/2)
@@ -201,7 +245,7 @@ base_filename = pathlib.Path(data_filename).stem
 csv_filename = DIR + base_filename + '.csv'
 with open(csv_filename, 'w') as csv_file:
 
-    csv_file.write('index,time,median2,median1,mean,mean int,original\n')
+    csv_file.write('index,time,median2,median1,mean,mean int,orig_base,original\n')
     for index in range(len(median_data)):
         csv_file.write(str(index) + ',')
         csv_file.write(str(time[index]) + ',')
@@ -209,23 +253,26 @@ with open(csv_filename, 'w') as csv_file:
         csv_file.write(str(median_data[index]) + ',')
         csv_file.write(str(mean_data[index]) + ',')
         csv_file.write(str(mean_data_int[index]) + ',')
+        csv_file.write(str(orig_base_data[index]) + ',')
         csv_file.write(str(orig_data[index]) + '\n')
 
 # ------------- draw plots
 
+if plot_graph: # draw the plot
+    fig, ax = plt.subplots()
+    ax.plot(time, median2_data, linewidth = 3, color='k', label='median 2')
+    ax.plot(time, orig_data, linewidth=0.5, color='b', linestyle='dotted', label='original data')
+    ax.plot(time, median_data, color='r', label= 'median 1')
+    ax.plot(time, mean_data, color='g', label = 'mean')
+    ax.plot(time, mean_data_int, color='m', linewidth = 1, linestyle='dotted', label = 'mean integer')
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0, top=max_value)
+    ax.set(yticks=np.arange(0,max_value,20))
+    ax.grid(True)
+    ax.legend()
 
-fig, ax = plt.subplots()
-ax.plot(time, median2_data, linewidth = 3, color='k', label='median 2')
-ax.plot(time, orig_data, linewidth=0.5, color='b', linestyle='dotted', label='original data')
-ax.plot(time, median_data, color='r', label= 'median 1')
-ax.plot(time, mean_data, color='g', label = 'mean')
-#ax.plot(time, mean_data_int, color='m', linewidth = 1, linestyle='dotted', label = 'mean integer')
-ax.set_xlim(left=0)
-ax.set_ylim(bottom=0, top=max_value)
-ax.set(yticks=np.arange(0,max_value,20))
-ax.grid(True)
-ax.legend()
-plt.xlabel('Time (ms)')
-plt.ylabel('Position (um)')
-plt.show()
+    plt.title(base_filename)
+    plt.xlabel('Time (ms)')
+    plt.ylabel('Position (um)')
+    plt.show()
 

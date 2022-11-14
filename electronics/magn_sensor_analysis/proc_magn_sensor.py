@@ -201,7 +201,9 @@ for index in range(len(data)):
         median_data.append(int(np.median(adjust_data_window)))
         if index == DBG_INDX and DBG:
             print(median_data[-1])
-        mean_data.append(round(np.mean(adjust_data_window),1))
+        #mean_data.append(round(np.mean(adjust_data_window),1))
+        # no round
+        mean_data.append(np.mean(adjust_data_window))
         mean_data_int.append(int(round(np.mean(adjust_data_window),0)))
 
         # each sample is 0.25 ms
@@ -215,23 +217,30 @@ for index in range(len(median_data)):
     mean_data_int[index] = mean_data_int[index] - min_val 
     orig_base_data[index] = orig_base_data[index] - min_val 
 
+# second median filter
 # second mean filter
 side2_window = int(side_window/2)
 median2_data = []
+mean2_data = []
 trend = [] 
 for index, data_i in enumerate(median_data):
     if index >= side2_window and index < numdata-side2_window:
-        data_window = median_data[index-side2_window:index+side2_window+1]
-        median2_data.append(int(np.median(data_window)))
+        mediandata_window = median_data[index-side2_window:index+side2_window+1]
+        median2_data.append(int(np.median(mediandata_window)))
+
+        meandata_window = mean_data[index-side2_window:index+side2_window+1]
+        mean2_data.append(np.mean(meandata_window))
     else:
         median2_data.append(data_i)
+        mean2_data.append(mean_data[index])
       
 max_value = 0
 # and now to have it in micrometer
 for index in range(len(median_data)):
     median_data[index]   = round(median_data[index]   * um_incr,1)
     median2_data[index]  = round(median2_data[index]  * um_incr,1)
-    mean_data[index]     = round(mean_data[index]     * um_incr,1)
+    mean_data[index]     = round(mean_data[index]     * um_incr,2)
+    mean2_data[index]     = round(mean2_data[index]     * um_incr,2)
     mean_data_int[index] = round(mean_data_int[index] * um_incr,1)
     if median_data[index] > max_value:
         max_value = median_data[index]
@@ -244,7 +253,7 @@ base_filename = pathlib.Path(data_filename).stem
 csv_filename = DIR + base_filename + '.csv'
 with open(csv_filename, 'w') as csv_file:
 
-    csv_file.write('index,time,median2,median1,mean,mean int,orig_base,original\n')
+    csv_file.write('index,time,median2,median1,mean,mean int,orig_base,original,mean2\n')
     for index in range(len(median_data)):
         csv_file.write(str(index) + ',')
         csv_file.write(str(time[index]) + ',')
@@ -253,7 +262,8 @@ with open(csv_filename, 'w') as csv_file:
         csv_file.write(str(mean_data[index]) + ',')
         csv_file.write(str(mean_data_int[index]) + ',')
         csv_file.write(str(orig_base_data[index]) + ',')
-        csv_file.write(str(orig_data[index]) + '\n')
+        csv_file.write(str(orig_data[index]) + ',')
+        csv_file.write(str(mean2_data[index]) + '\n')
 
 # ------------- draw plots
 
@@ -261,8 +271,9 @@ if plot_graph: # draw the plot
     fig, ax = plt.subplots()
     ax.plot(time, median2_data, linewidth = 3, color='k', label='median 2')
     ax.plot(time, orig_data, linewidth=0.5, color='b', linestyle='dotted', label='original data')
-    ax.plot(time, median_data, color='r', label= 'median 1')
-    ax.plot(time, mean_data, color='g', label = 'mean')
+    #ax.plot(time, median_data, color='r', label= 'median 1')
+    ax.plot(time, mean_data, color='r', label = 'mean1')
+    ax.plot(time, mean2_data, color='g', label = 'mean2')
     ax.plot(time, mean_data_int, color='m', linewidth = 1, linestyle='dotted', label = 'mean integer')
     ax.set_xlim(left=0)
     ax.set_ylim(bottom=0, top=max_value)

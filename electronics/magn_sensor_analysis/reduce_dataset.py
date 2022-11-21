@@ -12,12 +12,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
 
-# directory where the received binary files are
-DIR = "./files/"
-
-
-# ### Select File by uncommenting
-
 # ------------- Select File by uncommenting (extension .csv not included)
 
 # --- September 2022 experiments
@@ -27,26 +21,46 @@ DIR = "./files/"
 #csv_filename = "capture_82_1"
 #csv_filename = "capture_100_1"
 
-# --- November 2022 experiments
+# --- November 2022 experiments, wrong experiments
 #csv_filename = "mov_100mmh_1_to_10_fallo"
 #csv_filename = "mov_100mmh_1_to_20"
 #csv_filename = "mov_25mmh_10_to_20_cont_50"
 #csv_filename = "mov_25mmh_1_to_5"
 #csv_filename = "mov_25mmh_cont_50"
-csv_filename = "mov_75mmh_1_to_20"
+#csv_filename = "mov_75mmh_1_to_20"
+
+# cuts from november experiments, second set:
+
+csv_filename = "exp5kg_25mmh_5mm_0_763s"
+#csv_filename = "exp5kg_25mmh_10mm_800_2250s"
+#csv_filename = "exp5kg_25mmh_20mm_2700_5620s"
+#csv_filename = "exp5kg_25mmh_50mm_5620_12247s"
+
+#csv_filename = "exp5kg_75mmh_5mm_0_288s"
+#csv_filename = "exp5kg_75mmh_10mm_288_875s"
+#csv_filename = "exp5kg_75mmh_20mm_875_1900s"
+#csv_filename = "exp5kg_75mmh_50mm_2063_4500s"
+
+#csv_filename = "exp5kg_100mmh_5mm_0_255s"
+#csv_filename = "exp5kg_100mmh_10mm_255_625s"
+#csv_filename = "exp5kg_100mmh_20mm_663_1400s"
+#csv_filename = "exp5kg_100mmh_50mm_1488_3300s"
+
 
 if csv_filename.startswith("mov"):
-    # november experiment
+    # november experiment wrong experiment
     DIR = "./files_nov/"
+elif csv_filename.startswith("exp5kg"):
+    # november experiment good experiment
+    DIR = "./files_nov2/"
 else:
     # september experiment
     DIR = "./files/"
 
-
 csv_fulfilename = DIR + csv_filename + '.csv'
 
 # this is the order
-# index time median2 median1 mean mean_int orig_data
+# index time median2 median1 mean mean_int orig_basedata orig_data
 
 time      = []
 median2   = []
@@ -54,6 +68,7 @@ median1   = []
 mean      = []
 mean_int  = []
 orig_data = []
+orig_basedata = [] # added the base
 
 distance_list = []
 
@@ -71,7 +86,8 @@ with open(csv_fulfilename,"r") as csv_file:
             median1.append(float(csv_row[3]))
             mean.append(float(csv_row[4]))
             mean_int.append(float(csv_row[5]))
-            orig_data.append(int(csv_row[6]))
+            orig_basedata.append(int(csv_row[6]))
+            orig_data.append(int(csv_row[7]))
             index = int(csv_row[0])
             if index == 0:
                 prev_index = 0
@@ -125,11 +141,12 @@ red_median1   = []
 red_mean      = []
 red_mean_int  = []
 red_orig_data = []
+red_orig_basedata = [] # added the base
 
 csvres_filename = DIR + csv_filename + '_red.csv'
 with open(csvres_filename, 'w') as csv_file:
 
-    csv_file.write('index,time,median2,median1,mean,mean int,original\n')
+    csv_file.write('index,time,median2,median1,mean,mean int,original base,original\n')
     for index in range(len(median2)):
         if index % skip == 0:
             csv_file.write(str(index) + ',')
@@ -138,6 +155,7 @@ with open(csvres_filename, 'w') as csv_file:
             csv_file.write(str(median1[index]) + ',')
             csv_file.write(str(mean[index]) + ',')
             csv_file.write(str(mean_int[index]) + ',')
+            csv_file.write(str(orig_basedata[index]) + ',')
             csv_file.write(str(orig_data[index]) + '\n')
             red_index = index
             red_time.append(int(time[index]))
@@ -145,6 +163,7 @@ with open(csvres_filename, 'w') as csv_file:
             red_median1.append(median1[index])
             red_mean.append(mean[index])
             red_mean_int.append(mean_int[index])
+            red_orig_basedata.append(orig_basedata[index])
             red_orig_data.append(orig_data[index])
 
 # ------------- draw plots
@@ -153,6 +172,7 @@ max_value = max(red_median2)
 
 fig, ax = plt.subplots()
 ax.plot(red_time, red_median2, linewidth = 3, color='k', label='median 2')
+ax.plot(red_time, red_orig_basedata, linewidth=0.5, color='c', linestyle='dotted', label='original basedata')
 ax.plot(red_time, red_orig_data, linewidth=0.5, color='b', linestyle='dotted', label='original data')
 ax.plot(red_time, red_median1, color='r', label= 'median 1')
 ax.plot(red_time, red_mean, color='g', label = 'mean')
@@ -162,6 +182,7 @@ ax.set_ylim(bottom=0, top=max_value)
 ax.set(yticks=np.arange(0,max_value,20))
 ax.grid(True)
 ax.legend()
+plt.title('Reduced ' csv_filename)
 plt.xlabel('Time (ms)')
 plt.ylabel('Position (um)')
 plt.show()

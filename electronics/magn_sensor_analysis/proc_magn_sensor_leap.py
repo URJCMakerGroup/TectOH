@@ -41,11 +41,11 @@ plot_graph = False
 # cuts:
 
 #data_filename = "exp5kg_25mmh_5mm_0_763s.bin"
-#data_filename = "exp5kg_25mmh_10mm_800_2250s.bin"
-#data_filename = "exp5kg_25mmh_20mm_2700_5620s.bin"
-#data_filename = "exp5kg_25mmh_50mm_5620_12247s.bin"
+data_filename = "exp5kg_25mmh_10mm_800_2250s.bin"
+data_filename = "exp5kg_25mmh_20mm_2700_5620s.bin"
+data_filename = "exp5kg_25mmh_50mm_5620_12247s.bin"
 
-#data_filename = "exp5kg_75mmh_5mm_0_288s.bin"
+data_filename = "exp5kg_75mmh_5mm_0_288s.bin"
 #data_filename = "exp5kg_75mmh_10mm_288_875s.bin"
 #data_filename = "exp5kg_75mmh_20mm_875_1900s.bin"
 #data_filename = "exp5kg_75mmh_50mm_2063_4500s.bin"
@@ -53,7 +53,7 @@ plot_graph = False
 #data_filename = "exp5kg_100mmh_5mm_0_255s.bin"
 #data_filename = "exp5kg_100mmh_10mm_255_625s.bin"
 #data_filename = "exp5kg_100mmh_20mm_663_1400s.bin"
-data_filename = "exp5kg_100mmh_50mm_1488_3300s.bin"
+#data_filename = "exp5kg_100mmh_50mm_1488_3300s.bin"
 
 
 if data_filename.startswith("mov"):
@@ -67,6 +67,8 @@ else:
     DIR = "./files/"
 
 data_fulfilename = DIR + data_filename
+
+print ('Analisys for ' + data_filename)
 
 
 with open(data_fulfilename,"rb") as f:
@@ -112,6 +114,8 @@ debug1 = True # to print a debug the first time
 
 first_value_in = False
 
+DIFF = 128
+
 for index in range(len(data)):
     # example window=9, side_window=4
     #         numdata=20 (0 to 19)
@@ -135,12 +139,15 @@ for index in range(len(data)):
                 # check the last data, it should be similar, sometimes
                 # there is a 256 error with the previous
                 base_datawin_i = base + datawin_i
-                if prev_median - base_datawin_i > 100: # there is error with base 
+                if prev_median - base_datawin_i > DIFF: # there is error with base 
                     base_datawin_i = base + datawin_i + 256
-                elif base_datawin_i - prev_median > 100: # there is error with base 
+                elif base_datawin_i - prev_median > DIFF: # there is error with base 
                     base_datawin_i = base + datawin_i - 256
-                if abs(base_datawin_i - prev_median) > 100: # check if the modification is right
-                    print ('Check Index: ' + str(index)) 
+                if abs(base_datawin_i - prev_median) > DIFF: # check if the modification is right
+                    print ('Check Index: ' + str(index) +
+                           ' - basedatawin: ' + str(base_datawin_i) +
+                           ' - prev_median: '   + str(prev_median) +
+                           ' - diff: '   + str(base_datawin_i - prev_median)) 
                 adjust_data_window.append(base_datawin_i)
             else: # only the first time, not optimized, but just once
                 if max(data_window) - min(data_window) > 100: # too much difference
@@ -154,9 +161,11 @@ for index in range(len(data)):
                         print ('check first index, should be an error')
                 else:
                     adjust_data_window.append(datawin_i)
-            if (max(adjust_data_window) - min(adjust_data_window) > 100) and debug1:
-                print('Error, adjust data window should have similar values')
-                print('Index: ' + index)
+            max_diff_window = max(adjust_data_window) - min(adjust_data_window)
+            if (max_diff_window > DIFF) and debug1:
+                print('Check, adjust data window should have similar values')
+                print('Index: ' + str(index))
+                print('Diff: ' + str(max_diff_window))
                 print('adjust_data_window: ' + str(adjust_data_window))
                 debug1 = False
                  
@@ -166,11 +175,11 @@ for index in range(len(data)):
 
         origbase_data_i = data[index] + base
         if median_data: # if not empty (not the first data to attach
-            if prev_median - origbase_data_i > 100: # there is error with base 
+            if prev_median - origbase_data_i > 160: # there is error with base 
                 origbase_data_i += 256
-            elif origbase_data_i - prev_median > 100: # there is error with base 
+            elif origbase_data_i - prev_median > 160: # there is error with base 
                 origbase_data_i -= 256
-            if abs(prev_median - origbase_data_i) > 100: # there is error with base 
+            if abs(prev_median - origbase_data_i) > 160: # there is error with base 
                 print ('Check Index: ' + str(index)) 
         orig_base_data.append(origbase_data_i)
               

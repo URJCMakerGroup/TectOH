@@ -42,10 +42,10 @@ plot_graph = False
 
 #data_filename = "exp5kg_25mmh_5mm_0_763s.bin"
 data_filename = "exp5kg_25mmh_10mm_800_2250s.bin"
-data_filename = "exp5kg_25mmh_20mm_2700_5620s.bin"
-data_filename = "exp5kg_25mmh_50mm_5620_12247s.bin"
+#data_filename = "exp5kg_25mmh_20mm_2700_5620s.bin"
+#data_filename = "exp5kg_25mmh_50mm_5620_12247s.bin"
 
-data_filename = "exp5kg_75mmh_5mm_0_288s.bin"
+#data_filename = "exp5kg_75mmh_5mm_0_288s.bin"
 #data_filename = "exp5kg_75mmh_10mm_288_875s.bin"
 #data_filename = "exp5kg_75mmh_20mm_875_1900s.bin"
 #data_filename = "exp5kg_75mmh_50mm_2063_4500s.bin"
@@ -130,25 +130,47 @@ for index in range(len(data)):
             first_value_in = True
             prev_median = data[index]
         else:
-            prev_median = median_data[-1]
-            base = 256 * (prev_median // 256)
-
+            if len(median_data) > side_window:
+                window_1stmedian = median_data[-(side_window-1)]
+            else: # not enough data yet
+                window_1stmedian = median_data[0]
+            base = 256 * (window_1stmedian // 256)
         adjust_data_window = []
-        for datawin_i in data_window:
+        for idx, datawin_i in enumerate(data_window):
             if median_data: # if not empty (not the first data to attach
                 # check the last data, it should be similar, sometimes
                 # there is a 256 error with the previous
-                base_datawin_i = base + datawin_i
-                if prev_median - base_datawin_i > DIFF: # there is error with base 
-                    base_datawin_i = base + datawin_i + 256
-                elif base_datawin_i - prev_median > DIFF: # there is error with base 
-                    base_datawin_i = base + datawin_i - 256
-                if abs(base_datawin_i - prev_median) > DIFF: # check if the modification is right
-                    print ('Check Index: ' + str(index) +
-                           ' - basedatawin: ' + str(base_datawin_i) +
-                           ' - prev_median: '   + str(prev_median) +
-                           ' - diff: '   + str(base_datawin_i - prev_median)) 
-                adjust_data_window.append(base_datawin_i)
+                if idx == 0: # take its median, because some times there is a big change
+                    # although it is not common
+                    base_datawin_i = base + datawin_i
+                    if window_1stmedian - base_datawin_i > DIFF: # there is error with base 
+                        base = base + 256
+                        base_datawin_i = base + datawin_i
+                    elif base_datawin_i - window_1stmedian > DIFF: # there is error with base 
+                        base = base - 256
+                        base_datawin_i = base + datawin_i
+                    if abs(base_datawin_i - window_1stmedian) > DIFF: # check if the modification is right
+                        print ('Check Index: ' + str(index) +
+                               ' - basedatawin: ' + str(base_datawin_i) +
+                               ' - win_1stmedian: '   + str(window_1stmedian) +
+                               ' - diff: '   + str(base_datawin_i - base)) 
+                    adjust_data_window.append(base_datawin_i)
+                    basedatawin_i_prev = base_datawin_i
+                else: # the following elements will take the reference of the previous
+                    base_datawin_i = base + datawin_i
+                    if basedatawin_i_prev - base_datawin_i > DIFF: # there is error with base 
+                        base = base + 256
+                        base_datawin_i = base + datawin_i
+                    elif base_datawin_i - basedatawin_i_prev > DIFF: # there is error with base 
+                        base = base - 256
+                        base_datawin_i = base + datawin_i
+                    if abs(base_datawin_i - basedatawin_i_prev) > DIFF: # check if the modification is right
+                        print ('Check index: ' + str(index) +
+                               ' - basedatawin: ' + str(base_datawin_i) +
+                               ' - prev_datawin: '   + str(base_datawin_i) +
+                               ' - diff: '   + str(base_datawin_i - base_datawin_i)) 
+                    adjust_data_window.append(base_datawin_i)
+                    basedatawin_i_prev = base_datawin_i
             else: # only the first time, not optimized, but just once
                 if max(data_window) - min(data_window) > 100: # too much difference
                     # overflow
@@ -170,16 +192,18 @@ for index in range(len(data)):
                 debug1 = False
                  
         # we have the window for the median
-        median_data.append(int(np.median(adjust_data_window)))
+        median_data_i = int(np.median(adjust_data_window))
+        median_data.append(median_data_i)
+        # calculate its base
+        base_median_i  = 256 * (median_data_i // 256)
         # introduce the orginal data with its base
-
-        origbase_data_i = data[index] + base
+        origbase_data_i = data[index] + base_median_i
         if median_data: # if not empty (not the first data to attach
-            if prev_median - origbase_data_i > 160: # there is error with base 
+            if prev_median - origbase_data_i > DIFF: # there is error with base 
                 origbase_data_i += 256
-            elif origbase_data_i - prev_median > 160: # there is error with base 
+            elif origbase_data_i - prev_median > DIFF: # there is error with base 
                 origbase_data_i -= 256
-            if abs(prev_median - origbase_data_i) > 160: # there is error with base 
+            if abs(prev_median - origbase_data_i) > DIFF: # there is error with base 
                 print ('Check Index: ' + str(index)) 
         orig_base_data.append(origbase_data_i)
               
@@ -192,6 +216,7 @@ for index in range(len(data)):
 
         # each sample is 0.25 ms
         time.append(0.25 * (index-side_window))
+        prev_median = median_data_i # for the next
 
 # get the minimum vale of all, so have them at zero
 min_val = min([min(median_data), min(mean_data_int), int(min(mean_data)), min(orig_base_data)])

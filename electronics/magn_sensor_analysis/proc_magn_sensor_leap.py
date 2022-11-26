@@ -41,12 +41,12 @@ plot_graph = False
 # cuts:
 
 #data_filename = "exp5kg_25mmh_5mm_0_763s.bin"
-data_filename = "exp5kg_25mmh_10mm_800_2250s.bin"
-#data_filename = "exp5kg_25mmh_20mm_2700_5620s.bin"
+#data_filename = "exp5kg_25mmh_10mm_800_2250s.bin"
+data_filename = "exp5kg_25mmh_20mm_2700_5620s.bin"
 #data_filename = "exp5kg_25mmh_50mm_5620_12247s.bin"
 
 #data_filename = "exp5kg_75mmh_5mm_0_288s.bin"
-#data_filename = "exp5kg_75mmh_10mm_288_875s.bin"
+data_filename = "exp5kg_75mmh_10mm_288_875s.bin"
 #data_filename = "exp5kg_75mmh_20mm_875_1900s.bin"
 #data_filename = "exp5kg_75mmh_50mm_2063_4500s.bin"
 
@@ -123,12 +123,13 @@ for index in range(len(data)):
     # or when the index is 15 < numdata-side_window)
     
     if index >= side_window and index < numdata-side_window:
-        orig_data.append(data[index])
+        data_index = data[index]
+        orig_data.append(data_index)
         data_window = data[index-side_window:index+side_window+1]
         if first_value_in == False: # this is the first value to be in
             base = 0
             first_value_in = True
-            prev_median = data[index]
+            prev_median = data_index
         else:
             if len(median_data) > side_window:
                 window_1stmedian = median_data[-(side_window-1)]
@@ -150,10 +151,10 @@ for index in range(len(data)):
                         base = base - 256
                         base_datawin_i = base + datawin_i
                     if abs(base_datawin_i - window_1stmedian) > DIFF: # check if the modification is right
-                        print ('Check Index: ' + str(index) +
+                        print ('Check Index - idx0: ' + str(index) +
                                ' - basedatawin: ' + str(base_datawin_i) +
                                ' - win_1stmedian: '   + str(window_1stmedian) +
-                               ' - diff: '   + str(base_datawin_i - base)) 
+                               ' - diff: '   + str(base_datawin_i - window_1stmedian)) 
                     adjust_data_window.append(base_datawin_i)
                     basedatawin_i_prev = base_datawin_i
                 else: # the following elements will take the reference of the previous
@@ -166,9 +167,10 @@ for index in range(len(data)):
                         base_datawin_i = base + datawin_i
                     if abs(base_datawin_i - basedatawin_i_prev) > DIFF: # check if the modification is right
                         print ('Check index: ' + str(index) +
+                               ' - id' + str(idx) +
                                ' - basedatawin: ' + str(base_datawin_i) +
-                               ' - prev_datawin: '   + str(base_datawin_i) +
-                               ' - diff: '   + str(base_datawin_i - base_datawin_i)) 
+                               ' - prev_datawin: '   + str(base_datawin_i_prev) +
+                               ' - diff: '   + str(base_datawin_i - base_datawin_i_prev)) 
                     adjust_data_window.append(base_datawin_i)
                     basedatawin_i_prev = base_datawin_i
             else: # only the first time, not optimized, but just once
@@ -197,14 +199,17 @@ for index in range(len(data)):
         # calculate its base
         base_median_i  = 256 * (median_data_i // 256)
         # introduce the orginal data with its base
-        origbase_data_i = data[index] + base_median_i
+        origbase_data_i = data_index + base_median_i
         if median_data: # if not empty (not the first data to attach
             if prev_median - origbase_data_i > DIFF: # there is error with base 
                 origbase_data_i += 256
             elif origbase_data_i - prev_median > DIFF: # there is error with base 
                 origbase_data_i -= 256
             if abs(prev_median - origbase_data_i) > DIFF: # there is error with base 
-                print ('Check Index: ' + str(index)) 
+                print ('Check Index: ' + str(index) + 
+                       ' - origbase_data_i: ' + str(origbase_data_i) +
+                       ' - prev_median: '   + str(prev_median) +
+                       ' - diff: '   + str(origbase_data_i - prev_median)) 
         orig_base_data.append(origbase_data_i)
               
         if index == DBG_INDX and DBG:

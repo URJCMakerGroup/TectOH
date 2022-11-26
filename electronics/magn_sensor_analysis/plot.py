@@ -43,6 +43,34 @@ elif not csv_name in csv_base_list:
     print("file not found: ", csv_name)
     exit()
 
+limit_in = True # if you want to plot from just the beginning
+if limit_in == True:
+    if csv_name.startswith("exp5kg_25mmh_5mm_"):
+        init = 30 * 1000 * 4 # start at 30 s
+        end = 738 * 1000 * 4 # end
+    elif csv_name.startswith("exp5kg_100mmh_20mm_"):
+        init = 950 * 4 # start at 950 ms
+        end = 719.2 * 1000 * 4 # end at 719,200 s
+    elif csv_name.startswith("exp5kg_100mmh_50mm_"):
+        init = 9783 * 4 # start at 9783 ms
+        end = 1805.7 * 1000 * 4 # end at 1805,700 s
+    elif csv_name.startswith("exp5kg_75mmh_50mm_"):
+        init = 11980 * 4 # start at 11980 ms
+        end =  2413.11 * 1000 * 4 # end at 2.4 Ms
+    elif csv_name.startswith("exp5kg_75mmh_20mm_"):
+        init = 58113 * 4 # start
+        end =  1018.226 * 1000 * 4 # end
+    elif csv_name.startswith("exp5kg_75mmh_10mm_"):
+        init = 37400 * 4 # start
+        end =  517.437 * 1000 * 4 # end
+        print (init)
+    else:
+        init = 0
+        end = 0
+else:
+    init = 0
+    end = 0
+
 
 csv_fulfilename = DIR + csv_name + '.csv'
 
@@ -58,7 +86,10 @@ red_mean_int  = []
 red_orig_basedata = []
 red_orig_data = []
 
-mean2_included = False
+#mean2_included = False
+
+scale_segs = False
+scale_segs = True
 
 with open(csv_fulfilename,"r") as csv_file:
     csv_reader = csv.reader(csv_file, delimiter=',')
@@ -66,46 +97,66 @@ with open(csv_fulfilename,"r") as csv_file:
     for csv_row in csv_reader:
         if first_row: # first row has the header
             first_row = False
-            if len(csv_row) == 9:
-                mean2_included = True # it was not in the beginning
+            idx = 0
         else:
-            red_time.append(float(csv_row[1])) # 0 is the index
-            red_median2.append(float(csv_row[2]))
-            red_median1.append(float(csv_row[3]))
-            red_mean.append(float(csv_row[4]))
-            red_mean_int.append(float(csv_row[5]))
-            red_orig_basedata.append(int(csv_row[6]))
-            red_orig_data.append(int(csv_row[7]))
-            if mean2_included:
+            if idx >= init:
+                if idx == init:
+                    zero_time =float(csv_row[1])
+                if scale_segs == True:
+                    red_time.append((float(csv_row[1])-zero_time)/1000) # 0 is the index
+                else:
+                    red_time.append(float(csv_row[1])-zero_time) # 0 is the index
+                red_median2.append(float(csv_row[2]))
+                red_median1.append(float(csv_row[3]))
+                red_mean.append(float(csv_row[4]))
+                red_mean_int.append(float(csv_row[5]))
+                basedata = csv_row[6]
+                if '.' in basedata:
+                    print("error, base data is not integer: " + basedata + ' # index: ' + csv_row[0])
+                red_orig_basedata.append(int(basedata))
+                red_orig_data.append(int(csv_row[7]))
                 red_mean2.append(float(csv_row[8]))
+            idx += 1
                             
 # ------------- draw plots
 
 #level = 15480 # change value if you want to see the base at certain level
 level = 0
+#level = 15480 # change value if you want to see the base at certain level
 if level != 0:
     red_orig_data = np.asarray(red_orig_data)
     red_orig_data += level
 
 #max_value = max(red_median2)
-max_value = max(red_orig_basedata)
+
+only_mean2 = False
+only_mean2 = True
+
 
 fig, ax = plt.subplots()
-ax.plot(red_time, red_median2, linewidth = 3, color='k', label='median 2')
-ax.plot(red_time, red_orig_basedata, linewidth=0.5, color='c', linestyle='dotted', label='original basedata')
-ax.plot(red_time, red_orig_data, linewidth=0.5, color='b', linestyle='dotted', label='original data')
-#ax.plot(red_time, red_median1, color='r', label= 'median 1')
-ax.plot(red_time, red_mean, color='g', label = 'mean')
-#ax.plot(red_time, red_mean_int, color='m', linewidth = 1, linestyle='dotted', label = 'mean integer')
-if mean2_included:
-    ax.plot(red_time, red_mean2, color='m', linewidth = 1, label = 'mean2')
-ax.set_xlim(left=0)
+if only_mean2 == False:
+    max_value = max(red_orig_basedata) + 50
+    ax.plot(red_time, red_median2, linewidth = 3, color='k', label='median 2')
+    ax.plot(red_time, red_orig_basedata, linewidth=0.5, color='c', linestyle='dotted', label='original basedata')
+    ax.plot(red_time, red_orig_data, linewidth=0.5, color='m', linestyle='dotted', label='original data')
+    #ax.plot(red_time, red_median1, color='r', label= 'median 1')
+    ax.plot(red_time, red_mean, color='g', label = 'mean')
+    #ax.plot(red_time, red_mean_int, color='m', linewidth = 1, linestyle='dotted', label = 'mean integer')
+else:
+    max_value = max(red_mean2) + 50
+
+ax.plot(red_time, red_mean2, color='b', linewidth = 1, label = 'mean2')
 ax.set_ylim(bottom=0, top=max_value)
+ax.set_xlim(left=0)
 #ax.set(yticks=np.arange(0,max_value,20))
+if only_mean2 == False:
+    ax.legend()
 ax.grid(True)
-ax.legend()
 plt.title(csv_name)
-plt.xlabel('Time (ms)')
+if scale_segs == True:
+    plt.xlabel('Time (s)')
+else:
+    plt.xlabel('Time (ms)')
 plt.ylabel('Position (um)')
 plt.show()
 

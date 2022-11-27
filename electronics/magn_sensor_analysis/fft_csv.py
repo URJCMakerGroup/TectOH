@@ -5,38 +5,53 @@ from scipy import signal
 import scipy.fftpack
 import csv
  
-#data_filename = "exp5kg_25mmh_5mm_0_763s.csv"
-#data_filename = "exp5kg_25mmh_10mm_800_2250s.csv"
-#data_filename = "exp5kg_25mmh_20mm_2700_5620s.csv"
-#data_filename = "exp5kg_25mmh_50mm_5620_12247s.csv"
+data_filename = "exp5kg_25mmh_5mm_0_763s_lp.csv"
+data_filename = "exp5kg_25mmh_10mm_800_2250s_lp.csv"
+#data_filename = "exp5kg_25mmh_20mm_2700_5620s_lp.csv"
+#data_filename = "exp5kg_25mmh_50mm_5620_12247s_lp.csv"
 
-#data_filename = "exp5kg_75mmh_5mm_0_288s.csv"
-#data_filename = "exp5kg_75mmh_10mm_288_875s.csv"
-#data_filename = "exp5kg_75mmh_20mm_875_1900s.csv"
-#data_filename = "exp5kg_75mmh_50mm_2063_4500s.csv"
+#data_filename = "exp5kg_75mmh_5mm_0_288s_lp.csv"
+#data_filename = "exp5kg_75mmh_10mm_288_875s_lp.csv"
+#data_filename = "exp5kg_75mmh_20mm_875_1900s_lp.csv"
+#data_filename = "exp5kg_75mmh_50mm_2063_4500s_lp.csv"
 
-#data_filename = "exp5kg_100mmh_5mm_0_255s.csv"
-#data_filename = "exp5kg_100mmh_10mm_255_625s.csv"
-#data_filename = "exp5kg_100mmh_20mm_663_1400s.csv"
-data_filename = "exp5kg_100mmh_50mm_1488_3300s.csv"
+#data_filename = "exp5kg_100mmh_5mm_0_255s_lp.csv"
+#data_filename = "exp5kg_100mmh_10mm_255_625s_lp.csv"
+#data_filename = "exp5kg_100mmh_20mm_663_1400s_lp.csv"
+#data_filename = "exp5kg_100mmh_50mm_1488_3300s_lp.csv"
 
 # choose what to plot, uncomment one:
 #plot_data = "median1"
 #plot_data = "median2"
 #plot_data = "mean"
-#plot_data = "mean2"
+plot_data = "mean2"
 #plot_data = "mean_int"
-plot_data = "orig_basedata"
+#plot_data = "orig_basedata"
 
-if data_filename == "exp5kg_25mmh_5mm_0_763s.csv":
-    init = 30 * 1000 * 4 # start at 30 s
-    end = 738 * 1000 * 4 # end
-elif data_filename == "exp5kg_100mmh_20mm_663_1400s.csv":
-    init = 950 * 4 # start at 950 ms
-    end = 719.2 * 1000 * 4 # end at 719,200 s
-elif data_filename == "exp5kg_100mmh_50mm_663_1400s.csv":
+if data_filename.startswith("exp5kg_25mmh_5mm_"):
+    init = 32 * 1000 * 4 # start at 30 s
+    end = 751 * 1000 * 4 # end
+elif data_filename.startswith("exp5kg_25mmh_10mm_"):
+    init = 3287 * 4 # start at 3.287 s
+    end = 1443.76 * 1000 * 4 # end
+elif data_filename.startswith("exp5kg_25mmh_20mm_"):
+    init = 38776 * 4 # start 
+    end = 2881.064 * 1000 * 4 # end
+elif data_filename.startswith("exp5kg_100mmh_20mm_"):
+    init = 968 * 4 # start at 950 ms
+    end = 719.3 * 1000 * 4 # end at 719,200 s
+elif data_filename.startswith("exp5kg_100mmh_50mm_"):
     init = 9783 * 4 # start at 9783 ms
     end = 1805.7 * 1000 * 4 # end at 1805,700 s
+elif data_filename.startswith("exp5kg_75mmh_50mm_"):
+    init = 11980 * 4 # start at 11980 ms
+    end =  2413.11 * 1000 * 4 # end at 2.4 Ms
+elif data_filename.startswith("exp5kg_75mmh_20mm_"):
+    init = 58113 * 4 # start
+    end =  1018.226 * 1000 * 4 # end
+elif data_filename.startswith("exp5kg_75mmh_10mm_"):
+    init = 37400 * 4 # start
+    end =  517.437 * 1000 * 4 # end
 else:
     init = 1000
     end = 0
@@ -44,6 +59,8 @@ else:
 DIR = "./files_nov2/"
 data_fulfilename = DIR + data_filename
 print("File to show: " + data_fulfilename)
+
+print("Taking ini: " + str(init/4000) + "  end: " + str(end/4000) + ' seconds')
 
 # mechanical frequency, revolutions per second of the screw
 LEAD = 3 # leadscrew has 3 mm lead mm_rev
@@ -138,10 +155,10 @@ print("Sampling rate: " + str(f_s) + ' Hz')
 #tot_time = num_samples * dt # total time
 tot_time = num_samples / f_s # total time
 
-option = 'PSD' 
-option = 'scipy' 
+#option = 'PSD' 
+#option = 'scipy' 
 option = 'orig' 
-option = 'scipy2' 
+#option = 'scipy2' 
 
 # to have "horizontal"
 x_pt = [0, num_samples-1]

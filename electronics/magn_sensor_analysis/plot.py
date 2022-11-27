@@ -43,14 +43,28 @@ elif not csv_name in csv_base_list:
     print("file not found: ", csv_name)
     exit()
 
-limit_in = True # if you want to plot from just the beginning
+# -------------------- Options
+limit_in = True # if you want to plot from just the beginning of movement
+#limit_in = False # if you want to plot from time zero
+#scale_segs = False
+scale_segs = True
+#only_mean2 = False
+only_mean2 = True
+# -------------------- Options
+
 if limit_in == True:
     if csv_name.startswith("exp5kg_25mmh_5mm_"):
-        init = 30 * 1000 * 4 # start at 30 s
-        end = 738 * 1000 * 4 # end
+        init = 32 * 1000 * 4 # start
+        end = 751 * 1000 * 4 # end
+    elif csv_name.startswith("exp5kg_25mmh_10mm_"):
+        init = 3287 * 4 # start
+        end = 1443.76 * 1000 * 4 # end
+    elif csv_name.startswith("exp5kg_25mmh_20mm_"):
+        init = 38776 * 4 # start
+        end = 2881.064 * 1000 * 4 # end
     elif csv_name.startswith("exp5kg_100mmh_20mm_"):
-        init = 950 * 4 # start at 950 ms
-        end = 719.2 * 1000 * 4 # end at 719,200 s
+        init = 968 * 4 # start at 950 ms
+        end = 719.3 * 1000 * 4 # end at 719,200 s
     elif csv_name.startswith("exp5kg_100mmh_50mm_"):
         init = 9783 * 4 # start at 9783 ms
         end = 1805.7 * 1000 * 4 # end at 1805,700 s
@@ -88,8 +102,6 @@ red_orig_data = []
 
 #mean2_included = False
 
-scale_segs = False
-scale_segs = True
 
 with open(csv_fulfilename,"r") as csv_file:
     csv_reader = csv.reader(csv_file, delimiter=',')
@@ -129,8 +141,11 @@ if level != 0:
 
 #max_value = max(red_median2)
 
-only_mean2 = False
-only_mean2 = True
+
+if only_mean2 == True:
+    min_mean2 = min(red_mean2)
+    for idx in range(len(red_mean2)):
+        red_mean2[idx] -= min_mean2 
 
 
 fig, ax = plt.subplots()

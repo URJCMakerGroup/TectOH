@@ -2,6 +2,9 @@
 # coding: utf-8
 
 # ## Magnetic Encoder Analysis
+# in this version, instead of going back to see the trend, 
+# we just see the previous value, and know that it cannot
+# bee a huge leap between samples
 
 import pathlib
 
@@ -17,7 +20,7 @@ plot_graph = False
 
 # --- September 2022 experiments
 #data_filename = "capture_10_1.bin"
-#data_filename = "capture_25_1.bin"
+data_filename = "capture_25_1.bin"
 #data_filename = "capture_50_1.bin"
 #data_filename = "capture_82_1.bin"
 #data_filename = "capture_100_1.bin"
@@ -35,6 +38,10 @@ plot_graph = False
 #data_filename = "exp5kg_75mmh.bin"
 #data_filename = "exp5kg_100mmh.bin"
 
+# --- November 2022 last round of good experiments
+#data_filename = "exp5kg_100mmh_1mm.bin"
+#data_filename = "exp0kg_100mmh_5mm.bin"
+
 # cuts:
 
 #data_filename = "exp5kg_25mmh_5mm_0_763s.bin"
@@ -48,15 +55,17 @@ plot_graph = False
 #data_filename = "exp5kg_75mmh_50mm_2063_4500s.bin"
 
 #data_filename = "exp5kg_100mmh_5mm_0_255s.bin"
-data_filename = "exp5kg_100mmh_10mm_255_625s.bin"
+#data_filename = "exp5kg_100mmh_10mm_255_625s.bin"
 #data_filename = "exp5kg_100mmh_20mm_663_1400s.bin"
 #data_filename = "exp5kg_100mmh_50mm_1488_3300s.bin"
+data_filename = "exp5kg_100mmh_50mm_1448_3300s.bin"
 
+# all data from novemeber
 
 if data_filename.startswith("mov"):
     # november experiment wrong experiment
     DIR = "./files_nov/"
-elif data_filename.startswith("exp5kg"):
+elif data_filename.startswith("exp5kg") or data_filename.startswith("exp0kg"):
     # november experiment good experiment
     DIR = "./files_nov2/"
 else:
@@ -64,6 +73,8 @@ else:
     DIR = "./files/"
 
 data_fulfilename = DIR + data_filename
+
+print ('Analisys for ' + data_filename)
 
 
 with open(data_fulfilename,"rb") as f:
@@ -101,14 +112,15 @@ primer = 1
 # each increment is 2 mm/4096 -> 0.488 um
 um_incr = 2/4.096
 
-# distance to go back to see the trend
-BACK = 6000
-
 # for debuging any index
 DBG_INDX = 129788*4
 DBG = False # set true to print for debug
 
 debug1 = True # to print a debug the first time
+
+first_value_in = False
+
+DIFF = 128
 
 for index in range(len(data)):
     # example window=9, side_window=4
@@ -117,95 +129,95 @@ for index in range(len(data)):
     # or when the index is 15 < numdata-side_window)
     
     if index >= side_window and index < numdata-side_window:
+        data_index = data[index]
+        orig_data.append(data_index)
         data_window = data[index-side_window:index+side_window+1]
-
-        # go back 8000 positions to see the value
-        if index > BACK + side_window:
-            # now we get the tendency by going back BACK points
-            back_index = index - BACK
-            base_floor = 256 * int(median_data[back_index]/256) # take the base
+        if first_value_in == False: # this is the first value to be in
+            base = 0
+            first_value_in = True
+            prev_median = data_index
         else:
-            back_index = side_window
-            base_floor = 0
-        base_ceil  = base_floor + 256 
-        # check if some elements of data_window has gone out of boundaries
+            if len(median_data) > side_window:
+                window_1stmedian = median_data[-(side_window-1)]
+            else: # not enough data yet
+                window_1stmedian = median_data[0]
+            base = 256 * (window_1stmedian // 256)
         adjust_data_window = []
-        if index == DBG_INDX and DBG:
-            print(data_window)
-        if max(data_window) - min(data_window) > 200: # a lot of difference, we are changing
-            # it means that it has overflow
-            if index == DBG_INDX and DBG:
-                print(max(data_window))
-                print (np.median(data[back_index-side_window:back_index+side_window+1]))
-
-            if np.median(data[back_index-side_window:back_index+side_window+1]) > 127:
-                # we are going up
-                if data[index] < 127: # a low number means, overflow, add the ceil
-                    orig_base_data.append(base_ceil + data[index])
-                else:
-                    orig_base_data.append(base_floor + data[index])
-
-                for datawin_i in data_window:
-                    if datawin_i < 127:
-                        adjust_data_window.append(base_ceil + datawin_i)
-                    else:
-                        adjust_data_window.append(base_floor + datawin_i)
-                if primer == 1 and DBG:
-                    print(datawin_i)
-                    print(base_ceil)
-                    print(base_floor)
-                    primer = 0
-                if index == DBG_INDX and DBG:
-                    print(adjust_data_window)
-                    print(base_ceil)
-                    print(base_floor)
-
-                base_floor = base_ceil # the next base will be ceil
-                
-            else: # going down
-                if data[index] < 127: # low number means it is ok
-                    orig_base_data.append(base_floor + data[index])
-                else:# a high number means, underflow, add the ceil
-                    orig_base_data.append(base_floor -256 + data[index])
-
-                for datawin_i in data_window:
-                    if datawin_i > 127:
-                        adjust_data_window.append(base_floor - 256 + datawin_i)
-                    else:
-                        adjust_data_window.append(base_floor + datawin_i)
-                base_floor = base_floor-256 # the next base will be floor-256
-                if index == DBG_INDX and DBG:
-                    print(adjust_data_window)
-                    print(base_ceil)
-                    print(base_floor)
-        else: # no overflow
-            for datawin_i in data_window:
-                if median_data: # if not empty (not the first data to attach
-                    # check the last data, it should be similar, sometimes
-                    # there is a 256 error with the previous, when the previous
-                    # median window has overflow, but not this, but base has 
-                    # been changed
-                    base_datawin_i = base_floor + datawin_i
-                    if median_data[-1] - base_datawin_i > 100: # there is error with base 
-                        base_floor = base_floor + 256
-                        base_datawin_i = base_floor + datawin_i
-                    elif base_datawin_i - median_data[-1] > 100: # there is error with base 
-                        base_floor = base_floor - 256
-                        base_datawin_i = base_floor + datawin_i
+        for idx, datawin_i in enumerate(data_window):
+            if median_data: # if not empty (not the first data to attach
+                # check the last data, it should be similar, sometimes
+                # there is a 256 error with the previous
+                if idx == 0: # take its median, because some times there is a big change
+                    # although it is not common
+                    base_datawin_i = base + datawin_i
+                    if window_1stmedian - base_datawin_i > DIFF: # there is error with base 
+                        base = base + 256
+                        base_datawin_i = base + datawin_i
+                    elif base_datawin_i - window_1stmedian > DIFF: # there is error with base 
+                        base = base - 256
+                        base_datawin_i = base + datawin_i
+                    if abs(base_datawin_i - window_1stmedian) > DIFF: # check if the modification is right
+                        print ('Check Index - idx0: ' + str(index) +
+                               ' - basedatawin: ' + str(base_datawin_i) +
+                               ' - win_1stmedian: '   + str(window_1stmedian) +
+                               ' - diff: '   + str(base_datawin_i - window_1stmedian)) 
                     adjust_data_window.append(base_datawin_i)
+                    basedatawin_i_prev = base_datawin_i
+                else: # the following elements will take the reference of the previous
+                    base_datawin_i = base + datawin_i
+                    if basedatawin_i_prev - base_datawin_i > DIFF: # there is error with base 
+                        base = base + 256
+                        base_datawin_i = base + datawin_i
+                    elif base_datawin_i - basedatawin_i_prev > DIFF: # there is error with base 
+                        base = base - 256
+                        base_datawin_i = base + datawin_i
+                    if abs(base_datawin_i - basedatawin_i_prev) > DIFF: # check if the modification is right
+                        print ('Check index: ' + str(index) +
+                               ' - id' + str(idx) +
+                               ' - basedatawin: ' + str(base_datawin_i) +
+                               ' - prev_datawin: '   + str(base_datawin_i_prev) +
+                               ' - diff: '   + str(base_datawin_i - base_datawin_i_prev)) 
+                    adjust_data_window.append(base_datawin_i)
+                    basedatawin_i_prev = base_datawin_i
+            else: # only the first time, not optimized, but just once
+                if max(data_window) - min(data_window) > 100: # too much difference
+                    # overflow
+                    if datawin_i > 215:
+                        adjust_data_window.append(datawin_i)
+                    elif datawin_i < 50: # small: overflow
+                        adjust_data_window.append(datawin_i + 256)
+                    else:
+                        adjust_data_window.append(datawin_i)
+                        print ('check first index, should be an error')
                 else:
-                    adjust_data_window.append(base_floor + datawin_i)
-                 
-            if (max(adjust_data_window) - min(adjust_data_window) > 100) and debug1:
-                print('Error, adjust data window should have similar values')
-                print('Index: ' + index)
+                    adjust_data_window.append(datawin_i)
+            max_diff_window = max(adjust_data_window) - min(adjust_data_window)
+            if (max_diff_window > DIFF) and debug1:
+                print('Check, adjust data window should have similar values')
+                print('Index: ' + str(index))
+                print('Diff: ' + str(max_diff_window))
                 print('adjust_data_window: ' + str(adjust_data_window))
                 debug1 = False
                  
-            orig_base_data.append(base_floor + data[index])
+        # we have the window for the median
+        median_data_i = int(np.median(adjust_data_window))
+        median_data.append(median_data_i)
+        # calculate its base
+        base_median_i  = 256 * (median_data_i // 256)
+        # introduce the orginal data with its base
+        origbase_data_i = data_index + base_median_i
+        if median_data: # if not empty (not the first data to attach
+            if prev_median - origbase_data_i > DIFF: # there is error with base 
+                origbase_data_i += 256
+            elif origbase_data_i - prev_median > DIFF: # there is error with base 
+                origbase_data_i -= 256
+            if abs(prev_median - origbase_data_i) > DIFF: # there is error with base 
+                print ('Check Index: ' + str(index) + 
+                       ' - origbase_data_i: ' + str(origbase_data_i) +
+                       ' - prev_median: '   + str(prev_median) +
+                       ' - diff: '   + str(origbase_data_i - prev_median)) 
+        orig_base_data.append(origbase_data_i)
               
-        orig_data.append(data[index])
-        median_data.append(int(np.median(adjust_data_window)))
         if index == DBG_INDX and DBG:
             print(median_data[-1])
         #mean_data.append(round(np.mean(adjust_data_window),1))
@@ -215,6 +227,7 @@ for index in range(len(data)):
 
         # each sample is 0.25 ms
         time.append(0.25 * (index-side_window))
+        prev_median = median_data_i # for the next
 
 # get the minimum vale of all, so have them at zero
 min_val = min([min(median_data), min(mean_data_int), int(min(mean_data)), min(orig_base_data)])
@@ -247,7 +260,7 @@ for index in range(len(median_data)):
     median_data[index]   = round(median_data[index]   * um_incr,1)
     median2_data[index]  = round(median2_data[index]  * um_incr,1)
     mean_data[index]     = round(mean_data[index]     * um_incr,2)
-    mean2_data[index]     = round(mean2_data[index]     * um_incr,2)
+    mean2_data[index]    = round(mean2_data[index]     * um_incr,2)
     mean_data_int[index] = round(mean_data_int[index] * um_incr,1)
     if median_data[index] > max_value:
         max_value = median_data[index]
@@ -257,7 +270,7 @@ max_value = max_value + (20 - max_value % 20)
 # ------------- Save to csv
 
 base_filename = pathlib.Path(data_filename).stem
-csv_filename = DIR + base_filename + '.csv'
+csv_filename = DIR + base_filename + '_lp.csv'
 with open(csv_filename, 'w') as csv_file:
 
     csv_file.write('index,time,median2,median1,mean,mean int,orig_base,original,mean2\n')

@@ -20,7 +20,7 @@ plot_graph = False
 
 # --- September 2022 experiments
 #data_filename = "capture_10_1.bin"
-#data_filename = "capture_25_1.bin"
+data_filename = "capture_25_1.bin"
 #data_filename = "capture_50_1.bin"
 #data_filename = "capture_82_1.bin"
 #data_filename = "capture_100_1.bin"
@@ -38,15 +38,19 @@ plot_graph = False
 #data_filename = "exp5kg_75mmh.bin"
 #data_filename = "exp5kg_100mmh.bin"
 
+# --- November 2022 last round of good experiments
+#data_filename = "exp5kg_100mmh_1mm.bin"
+#data_filename = "exp0kg_100mmh_5mm.bin"
+
 # cuts:
 
 #data_filename = "exp5kg_25mmh_5mm_0_763s.bin"
 #data_filename = "exp5kg_25mmh_10mm_800_2250s.bin"
-data_filename = "exp5kg_25mmh_20mm_2700_5620s.bin"
+#data_filename = "exp5kg_25mmh_20mm_2700_5620s.bin"
 #data_filename = "exp5kg_25mmh_50mm_5620_12247s.bin"
 
 #data_filename = "exp5kg_75mmh_5mm_0_288s.bin"
-data_filename = "exp5kg_75mmh_10mm_288_875s.bin"
+#data_filename = "exp5kg_75mmh_10mm_288_875s.bin"
 #data_filename = "exp5kg_75mmh_20mm_875_1900s.bin"
 #data_filename = "exp5kg_75mmh_50mm_2063_4500s.bin"
 
@@ -54,12 +58,14 @@ data_filename = "exp5kg_75mmh_10mm_288_875s.bin"
 #data_filename = "exp5kg_100mmh_10mm_255_625s.bin"
 #data_filename = "exp5kg_100mmh_20mm_663_1400s.bin"
 #data_filename = "exp5kg_100mmh_50mm_1488_3300s.bin"
+data_filename = "exp5kg_100mmh_50mm_1448_3300s.bin"
 
+# all data from novemeber
 
 if data_filename.startswith("mov"):
     # november experiment wrong experiment
     DIR = "./files_nov/"
-elif data_filename.startswith("exp5kg"):
+elif data_filename.startswith("exp5kg") or data_filename.startswith("exp0kg"):
     # november experiment good experiment
     DIR = "./files_nov2/"
 else:

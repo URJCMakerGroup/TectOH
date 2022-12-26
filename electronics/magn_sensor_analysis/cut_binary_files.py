@@ -80,7 +80,7 @@ dict_cuts = {
             'time_fin': 1400  # final time cut in seconds
             },
         50: { # This experiment didnt go well
-            'time_ini': 1488, # initial time cut in seconds
+            'time_ini': 1448, # initial time cut in seconds
             'time_fin': 3300 # final time cut in seconds
             }
         }

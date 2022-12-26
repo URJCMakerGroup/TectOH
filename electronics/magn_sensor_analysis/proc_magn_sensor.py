@@ -37,7 +37,7 @@ plot_graph = False
 
 # cuts:
 
-data_filename = "exp5kg_25mmh_5mm_0_763s.bin"
+#data_filename = "exp5kg_25mmh_5mm_0_763s.bin"
 #data_filename = "exp5kg_25mmh_10mm_800_2250s.bin"
 #data_filename = "exp5kg_25mmh_20mm_2700_5620s.bin"
 #data_filename = "exp5kg_25mmh_50mm_5620_12247s.bin"
@@ -48,7 +48,7 @@ data_filename = "exp5kg_25mmh_5mm_0_763s.bin"
 #data_filename = "exp5kg_75mmh_50mm_2063_4500s.bin"
 
 #data_filename = "exp5kg_100mmh_5mm_0_255s.bin"
-#data_filename = "exp5kg_100mmh_10mm_255_625s.bin"
+data_filename = "exp5kg_100mmh_10mm_255_625s.bin"
 #data_filename = "exp5kg_100mmh_20mm_663_1400s.bin"
 #data_filename = "exp5kg_100mmh_50mm_1488_3300s.bin"
 
@@ -108,6 +108,7 @@ BACK = 6000
 DBG_INDX = 129788*4
 DBG = False # set true to print for debug
 
+debug1 = True # to print a debug the first time
 
 for index in range(len(data)):
     # example window=9, side_window=4
@@ -194,6 +195,12 @@ for index in range(len(data)):
                     adjust_data_window.append(base_datawin_i)
                 else:
                     adjust_data_window.append(base_floor + datawin_i)
+                 
+            if (max(adjust_data_window) - min(adjust_data_window) > 100) and debug1:
+                print('Error, adjust data window should have similar values')
+                print('Index: ' + index)
+                print('adjust_data_window: ' + str(adjust_data_window))
+                debug1 = False
                  
             orig_base_data.append(base_floor + data[index])
               

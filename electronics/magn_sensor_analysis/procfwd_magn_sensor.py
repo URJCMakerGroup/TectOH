@@ -10,6 +10,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy import signal
 
+# set to True or False if you want to have the results plotted
+plot_graph = False
+# plot_graph = True
+
 # ------------- Select File by uncommenting
 
 # --- September 2022 experiments
@@ -19,17 +23,44 @@ from scipy import signal
 #data_filename = "capture_82_1.bin"
 #data_filename = "capture_100_1.bin"
 
-# --- November 2022 experiments
+# --- November 2022 wrong experiments
 #data_filename = "mov_100mmh_1_to_10_fallo.bin"
 #data_filename = "mov_100mmh_1_to_20.bin"
-data_filename = "mov_25mmh_10_to_20_cont_50.bin"
+#data_filename = "mov_25mmh_10_to_20_cont_50.bin"
 #data_filename = "mov_25mmh_1_to_5.bin"
 #data_filename = "mov_25mmh_cont_50.bin"
 #data_filename = "mov_75mmh_1_to_20.bin"
 
+# --- November 2022 good experiments
+#data_filename = "exp5kg_25mmh.bin"
+#data_filename = "exp5kg_75mmh.bin"
+#data_filename = "exp5kg_100mmh.bin"
+
+# cuts:
+
+#data_filename = "exp5kg_25mmh_5mm_0_763s.bin"
+data_filename = "exp5kg_25mmh_10mm_800_2250s.bin"
+#data_filename = "exp5kg_25mmh_20mm_2700_5620s.bin"
+#data_filename = "exp5kg_25mmh_50mm_5620_12247s.bin"
+
+#data_filename = "exp5kg_75mmh_5mm_0_288s.bin"
+#data_filename = "exp5kg_75mmh_10mm_288_875s.bin"
+#data_filename = "exp5kg_75mmh_20mm_875_1900s.bin"
+#data_filename = "exp5kg_75mmh_50mm_2063_4500s.bin"
+
+#data_filename = "exp5kg_100mmh_5mm_0_255s.bin"
+#data_filename = "exp5kg_100mmh_10mm_255_625s.bin"
+#data_filename = "exp5kg_100mmh_20mm_663_1400s.bin"
+#data_filename = "exp5kg_100mmh_50mm_1488_3300s.bin"
+
+
+
 if data_filename.startswith("mov"):
-    # november experiment
+    # november experiment wrong experiment
     DIR = "./files_nov/"
+elif data_filename.startswith("exp5kg"):
+    # november experiment good experiment
+    DIR = "./files_nov2/"
 else:
     # september experiment
     DIR = "./files/"
@@ -182,7 +213,6 @@ for index in range(len(median_data)):
     median2_data[index]  = round(median2_data[index]  * um_incr,1)
     mean_data[index]     = round(mean_data[index]     * um_incr,1)
     mean_data_int[index] = round(mean_data_int[index] * um_incr,1)
-    orig_base_data[index] = round(orig_base_data[index] * um_incr,1)
     if median_data[index] > max_value:
         max_value = median_data[index]
 
@@ -207,19 +237,21 @@ with open(csv_filename, 'w') as csv_file:
 
 # ------------- draw plots
 
+if plot_graph: # draw the plot
+    fig, ax = plt.subplots()
+    ax.plot(time, median2_data, linewidth = 3, color='k', label='median 2')
+    ax.plot(time, orig_data, linewidth=1, color='b', linestyle='dotted', label='original base')
+    ax.plot(time, median_data, color='r', label= 'median 1')
+    ax.plot(time, mean_data, color='g', label = 'mean')
+    ax.plot(time, mean_data_int, color='m', linewidth = 1, linestyle='dotted', label = 'mean integer')
+    ax.set_xlim(left=0)
+    ax.set_ylim(bottom=0, top=max_value)
+    ax.set(yticks=np.arange(0,max_value,20))
+    ax.grid(True)
+    ax.legend()
 
-fig, ax = plt.subplots()
-ax.plot(time, median2_data, linewidth = 3, color='k', label='median 2')
-ax.plot(time, orig_data, linewidth=1, color='b', linestyle='dotted', label='original base')
-ax.plot(time, median_data, color='r', label= 'median 1')
-ax.plot(time, mean_data, color='g', label = 'mean')
-#ax.plot(time, mean_data_int, color='m', linewidth = 1, linestyle='dotted', label = 'mean integer')
-ax.set_xlim(left=0)
-ax.set_ylim(bottom=0, top=max_value)
-ax.set(yticks=np.arange(0,max_value,20))
-ax.grid(True)
-ax.legend()
-plt.xlabel('Time (ms)')
-plt.ylabel('Position (um)')
-plt.show()
+    plt.title('fwd ' + base_filename)
+    plt.xlabel('Time (ms)')
+    plt.ylabel('Position (um)')
+    plt.show()
 

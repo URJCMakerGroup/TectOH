@@ -16,14 +16,24 @@ Documentation License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
 ## User guide
 
-[User guide](./userguide) Under construction...
+[Sandbox User guide](./userguide) Under construction...
 
 ## Firmware
 [Arduino code of the Sandbox](./firmware)
 
 ## Electronics
 
+### Linear Magnetic Sensor
+
 ### VHDL
 
 Displacement rate test with FPGA and linear sensor AS5311
 [VHDL code](./electronics/vhdl/as5311_uart)
+
+### Magnetic sensor analysis
+
+Analysis of the linear magnetic sensor
+[Python code](./electronics/magn_sensor_analysis)
+
+ - Preprocessing of the raw data from the sensor [Python code](proc_magn_sensor.py)
+ - Reducing the size of the processed data [Python code](reduce_dataset.py)

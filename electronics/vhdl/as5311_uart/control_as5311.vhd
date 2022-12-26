@@ -114,6 +114,11 @@ architecture RTL of CONTROL_AS5133 is
   -- receive it, and we sample 4 times every millisecond. Since the motor takes
   -- around 5 ms to make a half step (6.4ms in our case with microstepping)
   -- we are taking 20 samples in that halfstep, which it seems enough
+  -- Besides, since we send every data to the UART, it has to be able to send
+  -- all that it receives. The UART is at 115200 baud, so every bit is sent
+  -- less than every 9us. Since it sends 8 bits, plus init and end bit: 10
+  -- so it takes around 90us in total. Since the sampling is every 250us
+  -- the UART will work fine in these conditions
   constant c_period_readsensor  : natural := 250000; -- ns -> 250us each sample
   constant c_cnt_readsensor     : natural := div_redondea
                                            (c_period_readsensor,c_period_ns_fpga); 

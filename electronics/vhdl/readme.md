@@ -3,9 +3,9 @@
 ## as5311_uart
 
 VHDL code to test the displacement rate of the Sandbox.
-It controls the [AS5411 linear position  sensor](https://ams.com/en/as5311) and sends the position data to the UART (via USB).
+It controls the [AS5311 linear position  sensor](https://ams.com/en/as5311) and sends the position data to the UART (via USB).
 
-The linear sensor has a magentic strip with 2mm pole pair and sends the absolute position within this 2mm in 12 bits -> Resolution 2mm/4096 = 0.488 nm
+The linear sensor has a magentic strip with 2mm pole pair and sends the absolute position within this 2mm in 12 bits -> Resolution 2mm/4096 = 0.488 um
 
 The linear sensor sends the data via SSI to the FPGA. Each SSI message has 18 bits, which 12 bits corresponds to the positional data. There are other information bits in the message.
 

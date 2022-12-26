@@ -11,3 +11,7 @@
 debug.log
 
 .vscode
+
+*.bin
+
+.ipynb*

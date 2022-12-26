@@ -63,7 +63,8 @@ if limit_in == True:
         init = 38776 * 4 # start
         end = 2881.064 * 1000 * 4 # end
     elif csv_name.startswith("exp5kg_100mmh_20mm_"):
-        init = 968 * 4 # start at 950 ms
+        #init = 968 * 4 # start at 950 ms
+        init = 0 * 4 # it seems that it start earlier, but there is some noise
         end = 719.3 * 1000 * 4 # end at 719,200 s
     elif csv_name.startswith("exp5kg_100mmh_50mm_"):
         init = 9783 * 4 # start at 9783 ms
@@ -134,7 +135,9 @@ with open(csv_fulfilename,"r") as csv_file:
 
 #level = 15480 # change value if you want to see the base at certain level
 level = 0
+#level = 1000
 #level = 15480 # change value if you want to see the base at certain level
+#level = 31200 # change value if you want to see the base at certain level
 if level != 0:
     red_orig_data = np.asarray(red_orig_data)
     red_orig_data += level

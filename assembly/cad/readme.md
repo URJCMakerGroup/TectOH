@@ -62,7 +62,11 @@ Layer height 0.2 mm. Infill 60%
 
 Layer height 0.2 mm. Infill 40%
 
-- STL file to print: [./stl/arduino_cover.stl](./stl/arduino_cover.stl)
+- FreeCAD source file: [./freecad/arduino_baseplate.FCStd](./freecad/arduino_baseplate.FCStd)
+- STEP file: [./step/arduino_baseplate.step](./step/arduino_baseplate.step)
+- STL file to print: [./stl/arduino_baseplate.stl](./stl/arduino_baseplate.stl)
+- Python file to generate FreeCAD file (you need [Maker Workbench](https://github.com/URJCMakerGroup/MakerWorkbench)) : [./py/arduino_baseplate.py](./py/arduino_baseplate.py)
+
 
 ## LCD support
 

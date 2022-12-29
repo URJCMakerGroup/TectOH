@@ -2,7 +2,7 @@
 
 ## VHDL
 
-[VHDL design for interfacing the high resolution magnetic linear sensor AS5311](./vhdl/readme.md)
+[VHDL design for interfacing the high resolution magnetic linear sensor AS5311](./vhdl/.)
 
 
 ## Magnetic sensor analysis

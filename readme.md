@@ -1,5 +1,7 @@
 # Tectonic Open Hardware (TectOH) Sandbox
 
+![Sandbox CAD image](./imgs/cad_lateral_view_sm.png)
+
 This is the second version of the Open Hardware Sandbox. [Link to the first version](https://github.com/URJCMakerGroup/TFG-Cristina-Fernandez) 
 
 ## License
@@ -15,18 +17,18 @@ Documentation License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
 ## Assembly
 
-[Sandbox assembly](./assembly/readme.md)
+[Sandbox assembly](./assembly/.)
 
 
 ## User guide
 
-[Sandbox user guide](./userguide/readme.md)
+[Sandbox user guide](./userguide/.)
 
 ## Firmware
-[Arduino code of the Sandbox](./firmware/readme.md)
+[Arduino code of the Sandbox](./firmware/.)
 
 ## Optional components
 
-[Optical or magnetic linear sensor](./optional/readme.md) can be used to monitor the displacement
+[Optical or magnetic linear sensor](./optional/.) can be used to monitor the displacement
 
 

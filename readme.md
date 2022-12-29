@@ -2,8 +2,6 @@
 
 This is the second version of the Open Hardware Sandbox. [Link to the first version](https://github.com/URJCMakerGroup/TFG-Cristina-Fernandez) 
 
-Documentation is still under construction, meanwhile check the first version
-
 ## License
 
 Hardware License: [CERN-OHL-S 2.0](cern_ohl_s_v2.txt)
@@ -14,26 +12,21 @@ Documentation License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
 ![licence summary](imgs/oshw_lic.png)
 
+
+## Assembly
+
+[Sandbox assembly](./assembly/readme.md)
+
+
 ## User guide
 
-[Sandbox User guide](./userguide) Under construction...
+[Sandbox user guide](./userguide/readme.md)
 
 ## Firmware
-[Arduino code of the Sandbox](./firmware)
+[Arduino code of the Sandbox](./firmware/readme.md)
 
-## Electronics
+## Optional components
 
-### Linear Magnetic Sensor
+[Optical or magnetic linear sensor](./optional/readme.md) can be used to monitor the displacement
 
-### VHDL
 
-Displacement rate test with FPGA and linear sensor AS5311
-[VHDL code](./electronics/vhdl/as5311_uart)
-
-### Magnetic sensor analysis
-
-Analysis of the linear magnetic sensor
-[Python code](./electronics/magn_sensor_analysis)
-
- - Preprocessing of the raw data from the sensor [Python code](proc_magn_sensor.py)
- - Reducing the size of the processed data [Python code](reduce_dataset.py)

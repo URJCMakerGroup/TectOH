@@ -1,4 +1,37 @@
 # Optional components
 
+He have used two linear sensor to measure the displacement:
+
+- Optical linear sensor
+- High-resolution magnetic sensor
+
+## Optical linear sensor
+
+One is a optical linear sensor that has been savaged from an old printer. The sensor is 150 LPI (lines per inch) so it has a resolution around 169 μm per line.
+
+The Arduino code includes the reading and display of the current position. However, since this component is optional, the Sandbox will work if it is not installed.
+
+The optical sensor that has been used is similar to the [AEDS-962x](./linear_optical_sensor/aeds-962x_150lpi.pdf)
+
+The sensor needs a small circuit to work and to install it requires some soldering skills, especially to take out from a printer.
+
+A 330 Ohm resistor has to be included between 5V and the led emitter of the sensor. As shown in the following figure:
+
+![Sensor connexion](./linear_optical_sensor/optical_sensor_sch_connex.png)
+
+We have used a simple board to solder the sensor pins and the 330Ω resistor.
+
+![Sensor board](./linear_optical_sensor/sensor_board.png)
+
+
+
+
+## High resolution magnetic sensor
+
+Since it is a high resolution sensor (less than 500 nm), the sensor will constantly update the measurement, as a consequence, it would demand too much attention from the Arduino and the system would not work properly. 
+To solve this problem, we have used an external FPGA to measure the position. This sensor has been used only to validate the positional accuracy of the system.
+
+More information on how the sensor works, and the source code of the interface can be found in this folder:
+
 [High-resolution linear magnetic sensor AS5311](./as5311_magn_sens/.)
 

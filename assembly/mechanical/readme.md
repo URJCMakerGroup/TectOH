@@ -1,4 +1,11 @@
 # Sandbox assembly
+
+Besides these instructions assembly section, the CAD source file of the Sandbox can be used as a guide for assembling the Sandbox.
+
+You can open the source file with [FreeCAD](https://www.freecadweb.org/) (free and opensource): [tectoh.FCStd](../cad/freecad/tectoh.FCStd)
+
+We couldn't upload the step file because it was too large for github.
+
 ## Step A: Assembly of the structure's lower base
 ![Step A](figs/small/step_a.png)
 

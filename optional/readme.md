@@ -3,7 +3,7 @@
 He have used two linear sensor to measure the displacement:
 
 - Optical linear sensor
-- High-resolution magnetic sensor
+- [High-resolution magnetic sensor](#high-resolution-magnetic-sensor)
 
 ## Optical linear sensor
 
@@ -13,7 +13,7 @@ The Arduino code includes the reading and display of the current position. Howev
 
 The optical sensor that has been used is similar to the [AEDS-962x](./linear_optical_sensor/aeds-962x_150lpi.pdf)
 
-The sensor needs a small circuit to work and to install it requires some soldering skills, especially to take out from a printer.
+The sensor needs a small circuit to work and to install it requires some soldering skills, especially if you to take it out from a printer.
 
 A 330 Ohm resistor has to be included between 5V and the led emitter of the sensor. As shown in the following figure:
 
@@ -22,6 +22,10 @@ A 330 Ohm resistor has to be included between 5V and the led emitter of the sens
 We have used a simple board to solder the sensor pins and the 330Ω resistor.
 
 ![Sensor board](./linear_optical_sensor/sensor_board.png)
+
+The following pictures show how the optical codestrip and the sensor is arranged
+
+![Optical sensor arrangement](./linear_optical_sensor/optical_sensor_pictures.png)
 
 
 

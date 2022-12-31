@@ -31,4 +31,6 @@ If the power suppy is computer ATX, its green cable should be tied to ground (bl
 
 [Larger image of electronics schematic](./electronics_sch_big.png)
 
+The section of the [optional components](../../optional/.) has more information on how to connect the optical sensor.
+
 

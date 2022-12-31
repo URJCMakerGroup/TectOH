@@ -9,7 +9,7 @@ He have used two linear sensor to measure the displacement:
 
 One is a optical linear sensor that has been savaged from an old printer. The sensor is 150 LPI (lines per inch) so it has a resolution around 169 μm per line.
 
-The Arduino code includes the reading and display of the current position. However, since this component is optional, the Sandbox will work if it is not installed.
+The Arduino code includes the reading and display of the current position. However, since this component is optional, the Sandbox will work even if it is not installed.
 
 The optical sensor that has been used is similar to the [AEDS-962x](./linear_optical_sensor/aeds-962x_150lpi.pdf)
 
@@ -28,6 +28,10 @@ The following pictures show how the optical codestrip and the sensor is arranged
 ![Optical sensor arrangement](./linear_optical_sensor/optical_sensor_pictures.png)
 
 
+More information about these sensors:
+
+- https://reprap.org/wiki/Optical_encoders_01
+- https://cuverita.wordpress.com/2013/06/30/how-to-master-an-hp-printer-optical-encoder-carriage/
 
 
 ## High resolution magnetic sensor

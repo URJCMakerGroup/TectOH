@@ -11,7 +11,7 @@ Notice at the bottom-right of the screen that the endstops status are displayed.
 
 [Larger welcome screen](./lcd_tectoh_p01_welcome.png)
 
-## Taks selection
+## Tasks selection
 
 After you have pressed the knob, you will find a menu in which you can select from these options:
 

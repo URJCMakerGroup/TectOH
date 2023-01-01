@@ -15,3 +15,15 @@ debug.log
 *.bin
 
 .ipynb*
+
+*/files/*
+*/files_nov2/*
+
+optional/as5311_magn_sens/magn_sensor_analysis/files/*
+optional/as5311_magn_sens/magn_sensor_analysis/files_nov2/*
+
+optional/as5311_magn_sens/magn_sensor_analysis/out_exp5kg_*.txt
+
+assembly/cad/freecad/seg/
+
+assembly/cad/step/tectoh.step

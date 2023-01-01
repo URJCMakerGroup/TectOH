@@ -16,6 +16,8 @@ It is not too complicated to build. It should be simpler than building a 3D prin
 
 This is the second version of the Open Hardware Sandbox. [Link to the first version](https://github.com/URJCMakerGroup/TFG-Cristina-Fernandez) 
 
+----
+
 ## License
 
 Hardware License: [CERN-OHL-S 2.0](cern_ohl_s_v2.txt)
@@ -55,6 +57,8 @@ You can use more expensive mechanical components to increase the overall precisi
 
 [Sandbox user guide](./userguide/.)
 
+----
+
 ## Pictures
 
 Sandbox experiment
@@ -70,6 +74,8 @@ The Sandbox pushing a 5-kg sand load constrained within a box
 
 ![Picture 5-kg box](./imgs/foto_5kg_box.jpg)
 
+----
+
 ## Contributors
 
 This work has been developed at [Universidad Rey Juan Carlos](https://www.urjc.es/) in Spain. It has bee a collaboration between the Area of Electronic Technology and the group [Tecvolrisk](https://tecvolrisk.wixsite.com/website) of the Area of Geology.
@@ -80,7 +86,7 @@ This work has been developed at [Universidad Rey Juan Carlos](https://www.urjc.e
 - [Rubén Nieto](https://gestion2.urjc.es/pdi/ver/ruben.nieto)
 - [Susana Borromeo](https://gestion2.urjc.es/pdi/ver/susana.borromeo)
 
-### Tecvolrisk
+### Tecvolrisk (Area of Geology)
 
 - [Marta Rincón](https://gestion2.urjc.es/pdi/ver/marta.rincon)
 - [Sandra González-Muñoz](https://tecvolrisk.wixsite.com/website/sandra-gonz%C3%A1lez-mu%C3%B1oz)
@@ -91,9 +97,10 @@ This work has been developed at [Universidad Rey Juan Carlos](https://www.urjc.e
 Some students have collaborated in the project doing their capstone project in Industrial Engineering.
 
 - [Adrián Zeus Román](https://github.com/zeus97roman/tfg): Initial project
-- [Cristina Fernández](https://github.com/cfg97/TFG-Cristina-Fernandez): Finished first version
-- [Javier Letón](https://github.com/jleton10/TFG_Javier_Leton): Added the optical sensor
-- Alicia Merchán: future work in adding a second degree of freedom
+- [Cristina Fernández García](https://github.com/cfg97/TFG-Cristina-Fernandez): Finished first version
+- [David Muñoz Bernal](https://github.com/davidmubernal/MakerWorkbench): FreeCAD workbench that includes many CAD parts of the project 
+- [Javier Letón](https://github.com/jleton10/TFG_Javier_Leton): Added the linear optical sensor
+- [Alicia Merchán](https://github.com/AliciaMH/TFGAliciaMerchan): future work in adding a second degree of freedom
 
 
 

@@ -34,12 +34,31 @@ More information about these sensors:
 - https://cuverita.wordpress.com/2013/06/30/how-to-master-an-hp-printer-optical-encoder-carriage/
 
 
+If you are going to buy one, maybe you could get the HEDS-973x Series. **Disclaimer:** We have not tried them, but seems seems similar, and even simpler because the led hasn't an independent power supply.
+
+[HEDS-973x](./linear_optical_sensor/heds_973x.pdf)
+
+
+
+
+
 ## High resolution magnetic sensor
 
 Since it is a high resolution sensor (less than 500 nm), the sensor will constantly update the measurement, as a consequence, it would demand too much attention from the Arduino and the system would not work properly. 
 To solve this problem, we have used an external FPGA to measure the position. This sensor has been used only to validate the positional accuracy of the system.
 
-More information on how the sensor works, and the source code of the interface can be found in this folder:
+We have used the breakout board, so it is not necessary to solder the chip, and it came with a magentic strip. The strip is small, but enough to make the experiments.
+
+This is the [datasheet](./as5311_magn_sens/as5311_board.pdf)
+
+And some links to suppliers:
+
+- [Digikey](https://www.digikey.es/en/products/detail/ams-osram/AS5311-TS-EK-AB/3828353)
+- [RS](https://es.rs-online.com/web/p/kits-de-desarrollo-de-sensores/2329691)
+- [Mouser](https://eu.mouser.com/ProductDetail/ams-OSRAM/AS5311-TS_EK_AB?qs=Rt6VE0PE%2FOfQFCqoE7AuPw%3D%3D)
+- [Farnell](https://es.farnell.com/ams-osram-group/as5311-ts-ek-ab/kit-placa-adapt-sensor-de-posici/dp/3976997?st=as5311)
+
+More information on how the sensor works, the source code of the interface, and the Python scripts to analyze the received data, can be found in this folder:
 
 [High-resolution linear magnetic sensor AS5311](./as5311_magn_sens/.)
 

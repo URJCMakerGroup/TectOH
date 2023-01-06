@@ -21,6 +21,10 @@ Parts to 3D print and CAD of the system:
 
 [Electronics assembly](./electronics/.)
 
+## Optional parts
+
+The [optional parts](../optional/.) are not required, but the are usefull to check that the device is moving as expected.
+
 
 
 

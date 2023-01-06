@@ -3,13 +3,15 @@
 
 ![Sandbox CAD image](./imgs/cad_lateral_view_sm.png)
 
-Low-cost Open-Hardware scientific and educational device for tectonic analogue modelling. [See Wikipedia entry on tectonic analogue modelling](https://en.wikipedia.org/wiki/Analogue_modelling_%28geology%29).
+Low-cost Open-Hardware scientific and educational device for tectonic analogue modelling. See Wikipedia entry on [tectonic analogue modelling](https://en.wikipedia.org/wiki/Analogue_modelling_%28geology%29).
 
 It can move at speeds from 1 mm/h to 100 mm/h.
 
-The stroke of the gantry is 270 mm but it can be easily customized for other lenghts.
+The stroke of the gantry is 270 mm but it can be easily customized for other lengths.
 
 The cost of the components is no more than 500 €, although for increased performance, precision components can be used at higher cost.
+
+There are some [optional components](#optional-components) for measuring the distance that would increase the cost. 
 
 It is not too complicated to build. It should be simpler than building a 3D printer or CNC.
 

@@ -21,8 +21,10 @@ debug.log
 
 optional/as5311_magn_sens/magn_sensor_analysis/files/*
 optional/as5311_magn_sens/magn_sensor_analysis/files_nov2/*
+optional/as5311_magn_sens/magn_sensor_analysis/exp_5kg/*
+optional/as5311_magn_sens/magn_sensor_analysis/exp_noload/*
+optional/as5311_magn_sens/magn_sensor_analysis/py_mios/*
 
-optional/as5311_magn_sens/magn_sensor_analysis/out_exp5kg_*.txt
 
 assembly/cad/freecad/seg/
 

@@ -3,7 +3,7 @@
 
 ![Sandbox CAD image](./imgs/cad_lateral_view_sm.png)
 
-Low-cost Open-Hardware scientific and educational device for tectonic analogue modelling. See Wikipedia entry on [tectonic analogue modelling](https://en.wikipedia.org/wiki/Analogue_modelling_%28geology%29).
+Low-cost Open-Hardware scientific and educational device for tectonic analogue modelling. See Wikipedia entry on [tectonic analogue modeling](https://en.wikipedia.org/wiki/Analogue_modelling_%28geology%29).
 
 It can move at speeds from 1 mm/h to 100 mm/h.
 
@@ -11,12 +11,12 @@ The stroke of the gantry is 270 mm but it can be easily customized for other len
 
 The cost of the components is no more than 500 €, although for increased performance, precision components can be used at higher cost.
 
-There are some [optional components](#optional-components) for measuring the distance that would increase the cost. 
+There are some [optional components](#distance-monitoring) for **measuring the distance** that would increase the cost.
 
 It is not too complicated to build. It should be simpler than building a 3D printer or CNC.
 
 
-This is the second version of the Open Hardware Sandbox. [Link to the first version](https://github.com/URJCMakerGroup/TFG-Cristina-Fernandez) 
+This is the second version of the Open Hardware Sandbox. [Link to the first version](https://github.com/URJCMakerGroup/TFG-Cristina-Fernandez)
 
 ----
 
@@ -28,8 +28,9 @@ Software License: [LGPL 3.0 or later](License.md)
 
 Documentation License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
-![licence summary](imgs/oshw_lic.png)
+![license summary](imgs/oshw_lic.png)
 
+----
 
 ## Bill of materials
 
@@ -41,19 +42,29 @@ You can use more expensive mechanical components to increase the overall precisi
 
 [Sandbox bill of materials (.ods file)](tectoh_bom.ods)
 
+----
 
 ## Assembly
 
 [Sandbox assembly](./assembly/.)
 
+----
 
 ## Firmware
 
 [Arduino code of the Sandbox](./firmware/.)
 
-## Optional components
+----
 
-[Optical or magnetic linear sensor](./optional/.) can be used to monitor the displacement
+## Distance monitoring
+
+[Optical or magnetic linear sensor](./optional/.) can be included in the Sandbox to monitor the displacement.
+These are optional subsystems, but they are very helpful to calibrate the Sandbox.
+
+This section includes graphs of the **results** and Python scripts to analyze the data from the magnetic sensor.
+
+
+----
 
 ## User guide
 

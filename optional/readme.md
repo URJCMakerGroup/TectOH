@@ -5,6 +5,8 @@ He have used two linear sensor to measure the displacement:
 - Optical linear sensor
 - [High-resolution magnetic sensor](#high-resolution-magnetic-sensor)
 
+----
+
 ## Optical linear sensor
 
 One is a optical linear sensor that has been savaged from an old printer. The sensor is 150 LPI (lines per inch) so it has a resolution around 169 μm per line.
@@ -39,6 +41,7 @@ If you are going to buy one, maybe you could get the HEDS-973x Series. **Disclai
 [HEDS-973x](./linear_optical_sensor/heds_973x.pdf)
 
 
+----
 
 
 
@@ -49,9 +52,9 @@ To solve this problem, we have used an external FPGA to measure the position. Th
 
 We have used the breakout board, so it is not necessary to solder the chip, and it came with a magentic strip. The strip is small, but enough to make the experiments.
 
-This is the [datasheet](./as5311_magn_sens/as5311_board.pdf)
+This is the [datasheet](./as5311_magn_sens/as5311_board.pdf) of the AS5311-TS-EK-AB adapter board.
 
-And some links to suppliers:
+And some links to suppliers where you can buy it:
 
 - [Digikey](https://www.digikey.es/en/products/detail/ams-osram/AS5311-TS-EK-AB/3828353)
 - [RS](https://es.rs-online.com/web/p/kits-de-desarrollo-de-sensores/2329691)

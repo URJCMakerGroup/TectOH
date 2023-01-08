@@ -13,64 +13,35 @@ import numpy as np
 from scipy import signal
 
 # set to True or False if you want to have the results plotted
-plot_graph = False
+plot_graph = False # better to draw the plot with plot.py
 # plot_graph = True
 
 # ------------- Select File by uncommenting
 
-# --- September 2022 experiments
-#data_filename = "capture_10_1.bin"
-data_filename = "capture_25_1.bin"
-#data_filename = "capture_50_1.bin"
-#data_filename = "capture_82_1.bin"
-#data_filename = "capture_100_1.bin"
+# --- No load experiments
+data_filename = "noload_10mmh_1mm.bin"
+#data_filename = "noload_25mmh_1mm.bin"
+#data_filename = "noload_50mmh_1mm.bin"
+#data_filename = "noload_82mmh_1mm.bin"
+#data_filename = "noload_100mmh_1mm.bin"
 
-# --- November 2022 experiments
-#data_filename = "mov_100mmh_1_to_10_fallo.bin"
-#data_filename = "mov_100mmh_1_to_20.bin"
-#data_filename = "mov_25mmh_10_to_20_cont_50.bin"
-#data_filename = "mov_25mmh_1_to_5.bin"
-#data_filename = "mov_25mmh_cont_50.bin"
-#data_filename = "mov_75mmh_1_to_20.bin"
+# --- Load experiments
+#data_filename = "load5kg_25mmh_5mm.bin"
+#data_filename = "load5kg_25mmh_10mm.bin"
+#data_filename = "load5kg_25mmh_20mm.bin"
 
-# --- November 2022 good experiments
-#data_filename = "exp5kg_25mmh.bin"
-#data_filename = "exp5kg_75mmh.bin"
-#data_filename = "exp5kg_100mmh.bin"
+#data_filename = "load5kg_75mmh_20mm.bin"
+#data_filename = "load5kg_75mmh_50mm.bin"
 
-# --- November 2022 last round of good experiments
-#data_filename = "exp5kg_100mmh_1mm.bin"
-#data_filename = "exp0kg_100mmh_5mm.bin"
+#data_filename = "load5kg_100mmh_20mm.bin"
+#data_filename = "load5kg_100mmh_50mm.bin"
 
-# cuts:
+# I have the experiments in different folders
 
-#data_filename = "exp5kg_25mmh_5mm_0_763s.bin"
-#data_filename = "exp5kg_25mmh_10mm_800_2250s.bin"
-#data_filename = "exp5kg_25mmh_20mm_2700_5620s.bin"
-#data_filename = "exp5kg_25mmh_50mm_5620_12247s.bin"
-
-#data_filename = "exp5kg_75mmh_5mm_0_288s.bin"
-#data_filename = "exp5kg_75mmh_10mm_288_875s.bin"
-#data_filename = "exp5kg_75mmh_20mm_875_1900s.bin"
-#data_filename = "exp5kg_75mmh_50mm_2063_4500s.bin"
-
-#data_filename = "exp5kg_100mmh_5mm_0_255s.bin"
-#data_filename = "exp5kg_100mmh_10mm_255_625s.bin"
-#data_filename = "exp5kg_100mmh_20mm_663_1400s.bin"
-#data_filename = "exp5kg_100mmh_50mm_1488_3300s.bin"
-data_filename = "exp5kg_100mmh_50mm_1448_3300s.bin"
-
-# all data from novemeber
-
-if data_filename.startswith("mov"):
-    # november experiment wrong experiment
-    DIR = "./files_nov/"
-elif data_filename.startswith("exp5kg") or data_filename.startswith("exp0kg"):
-    # november experiment good experiment
-    DIR = "./files_nov2/"
-else:
-    # september experiment
-    DIR = "./files/"
+if data_filename.startswith("noload"):
+    DIR = "./exp_noload/"
+else: # if data_filename.startswith("load5kg"):
+    DIR = "./exp_5kg/"
 
 data_fulfilename = DIR + data_filename
 
@@ -270,7 +241,7 @@ max_value = max_value + (20 - max_value % 20)
 # ------------- Save to csv
 
 base_filename = pathlib.Path(data_filename).stem
-csv_filename = DIR + base_filename + '_lp.csv'
+csv_filename = DIR + base_filename + '.csv'
 with open(csv_filename, 'w') as csv_file:
 
     csv_file.write('index,time,median2,median1,mean,mean int,orig_base,original,mean2\n')
@@ -285,7 +256,7 @@ with open(csv_filename, 'w') as csv_file:
         csv_file.write(str(orig_data[index]) + ',')
         csv_file.write(str(mean2_data[index]) + '\n')
 
-# ------------- draw plots
+# ------------- draw plots, better to draw the plot with plot.py
 
 if plot_graph: # draw the plot
     fig, ax = plt.subplots()

@@ -10,15 +10,14 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 
-# directory where the csv files are
-#DIR = "./files/"
-#DIR = "./files_nov/"
-DIR = "./files_nov2/"
+# directory where the csv files are, in my case, I put them in two 
+# different directories depending if they are the no-load or the 5kg experiments
+DIR = "./exp_5kg/"
+#DIR = "./exp_noload/"
 
 # ow.walk [2] are filenames
 dir_list = next(os.walk(DIR))[2]
 
-# could be reduced or not
 csv_list = [csv for csv in dir_list if csv.endswith('.csv')]
 
 if not csv_list: # list is false if empty
@@ -44,38 +43,40 @@ elif not csv_name in csv_base_list:
     exit()
 
 # -------------------- Options
-limit_in = True # if you want to plot from just the beginning of movement
-#limit_in = False # if you want to plot from time zero
-#scale_segs = False
-scale_segs = True
-#only_mean2 = False
-only_mean2 = True
+#limit_in = True # if you want to plot from just the beginning of movement
+limit_in = False # if you want to plot from time zero
+
+#scale_segs = False # if you wan the scale in milliseconds
+scale_segs = True # if you want the scale in seconds
+
+#only_mean2 = False # plot all the results
+only_mean2 = True # plot only the second average filter
 # -------------------- Options
 
 if limit_in == True:
-    if csv_name.startswith("exp5kg_25mmh_5mm_"):
+    if csv_name.startswith("load5kg_25mmh_5mm_"):
         init = 32 * 1000 * 4 # start
         end = 751 * 1000 * 4 # end
-    elif csv_name.startswith("exp5kg_25mmh_10mm_"):
+    elif csv_name.startswith("load5kg_25mmh_10mm_"):
         init = 3287 * 4 # start
         end = 1443.76 * 1000 * 4 # end
-    elif csv_name.startswith("exp5kg_25mmh_20mm_"):
+    elif csv_name.startswith("load5kg_25mmh_20mm_"):
         init = 38776 * 4 # start
         end = 2881.064 * 1000 * 4 # end
-    elif csv_name.startswith("exp5kg_100mmh_20mm_"):
+    elif csv_name.startswith("load5kg_100mmh_20mm_"):
         #init = 968 * 4 # start at 950 ms
         init = 0 * 4 # it seems that it start earlier, but there is some noise
         end = 719.3 * 1000 * 4 # end at 719,200 s
-    elif csv_name.startswith("exp5kg_100mmh_50mm_"):
+    elif csv_name.startswith("load5kg_100mmh_50mm_"):
         init = 9783 * 4 # start at 9783 ms
         end = 1805.7 * 1000 * 4 # end at 1805,700 s
-    elif csv_name.startswith("exp5kg_75mmh_50mm_"):
+    elif csv_name.startswith("load5kg_75mmh_50mm_"):
         init = 11980 * 4 # start at 11980 ms
         end =  2413.11 * 1000 * 4 # end at 2.4 Ms
-    elif csv_name.startswith("exp5kg_75mmh_20mm_"):
+    elif csv_name.startswith("load5kg_75mmh_20mm_"):
         init = 58113 * 4 # start
         end =  1018.226 * 1000 * 4 # end
-    elif csv_name.startswith("exp5kg_75mmh_10mm_"):
+    elif csv_name.startswith("load5kg_75mmh_10mm_"):
         init = 37400 * 4 # start
         end =  517.437 * 1000 * 4 # end
         print (init)
@@ -100,9 +101,6 @@ red_mean2     = []
 red_mean_int  = []
 red_orig_basedata = []
 red_orig_data = []
-
-#mean2_included = False
-
 
 with open(csv_fulfilename,"r") as csv_file:
     csv_reader = csv.reader(csv_file, delimiter=',')
@@ -133,11 +131,13 @@ with open(csv_fulfilename,"r") as csv_file:
                             
 # ------------- draw plots
 
+# this is for debugging, just leave the level to zero unless you know what you want
 #level = 15480 # change value if you want to see the base at certain level
-level = 0
 #level = 1000
 #level = 15480 # change value if you want to see the base at certain level
 #level = 31200 # change value if you want to see the base at certain level
+level = 0
+
 if level != 0:
     red_orig_data = np.asarray(red_orig_data)
     red_orig_data += level

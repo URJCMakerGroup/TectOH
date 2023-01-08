@@ -4,6 +4,8 @@ Besides each assembly section, the CAD of the Sandbox can be used as a guide for
 
 - FreeCAD file: [./cad/freecad/tectoh.FCStd](./cad/freecad/tectoh.FCStd)
 
+FreeCAD is Open Source Software that can be downloaded at no cost: [https://www.freecadweb.org/](https://www.freecadweb.org/)
+
 
 ## CAD
 

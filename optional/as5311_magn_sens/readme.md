@@ -1,16 +1,18 @@
-# Displacement rate test with FPGA and AS5311
+# Displacement monitoring with FPGA and the AS5311 magnetic linear sensor
 
-## VHDL
+The [AS5311 sensor](https://ams.com/en/as5311) is interfaced with an external FPGA board because the Arduino could not handle the Sandbox operation at the same time.
+We have used an FPGA board, but a high-performace microcontroller could be used.
+
+## VHDL design for interfacing the AS5311 with an FPGA
 
 [VHDL design for interfacing the high resolution magnetic linear sensor AS5311](./vhdl/.)
 
-It is explained how the interface is designed.
+The interface with the sensor is explained. Then the FPGA sends the data to a computer.
+
+----
 
 ## Magnetic sensor analysis
 
-Analysis of the linear magnetic sensor
-[Python code](./magn_sensor_analysis)
+In this folder we have the [Python scripts](./magn_sensor_analysis) that analyse the data from the magnetic sensor and plots it.
 
- - Preprocessing of the raw data from the sensor
- - Reducing the size of the processed data
- - Plotting the results
+A link to the data from the sensor is also in the folder

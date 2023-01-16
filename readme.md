@@ -30,6 +30,10 @@ Documentation License: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/)
 
 ![license summary](imgs/oshw_lic.png)
 
+![ES000033](imgs/oshwa_es000033.png)
+
+This device is [certified open hardware](https://certification.oshwa.org/es000033.html) by the [Open Source Hardware Association](https://www.oshwa.org/).
+
 ----
 
 ## Bill of materials

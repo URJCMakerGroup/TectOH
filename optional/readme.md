@@ -19,7 +19,7 @@ The sensor needs a small circuit to work and to install it requires some solderi
 
 A 330 Ohm resistor has to be included between 5V and the led emitter of the sensor. As shown in the following figure:
 
-![Sensor connexion](./linear_optical_sensor/optical_sensor_sch_connex.png)
+![Sensor connection](./linear_optical_sensor/optical_sensor_sch_connex.png)
 
 We have used a simple board to solder the sensor pins and the 330Ω resistor.
 
@@ -36,7 +36,7 @@ More information about these sensors:
 - https://cuverita.wordpress.com/2013/06/30/how-to-master-an-hp-printer-optical-encoder-carriage/
 
 
-If you are going to buy one, maybe you could get the HEDS-973x Series. **Disclaimer:** We have not tried them, but seems seems similar, and even simpler because the led hasn't an independent power supply.
+If you are going to buy one, maybe you could get the HEDS-973x Series. **Disclaimer:** We have not tried them, but they seem similar, and even simpler because the led do not have an independent power supply.
 
 [HEDS-973x](./linear_optical_sensor/heds_973x.pdf)
 

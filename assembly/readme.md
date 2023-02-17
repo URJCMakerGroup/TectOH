@@ -25,7 +25,7 @@ Parts to 3D print and CAD of the system:
 
 ## Optional parts
 
-The [optional parts](../optional/.) are not required, but the are usefull to check that the device is moving as expected.
+The [optional parts](../optional/.) are not required, but the are useful to check that the device is moving as expected.
 
 
 

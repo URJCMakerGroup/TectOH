@@ -45,5 +45,5 @@ When the Sandbox is moving, it will display the information of the experiment.
 
 Press the **Kill** button to abort the operation
 
-Unless you disconect the power suply of the Sandbox while moving, it will save the actual position even if it is switched off. This is useful if the preparation of the experiment takes time. So you can move the gantry to the desired postion. Prepare the experiment, and then switch on the Sandbox and start the experiment.
+Unless you disconnect the power supply of the Sandbox while moving, it will save the actual position even if it is switched off. This is useful if the preparation of the experiment takes time. So you can move the gantry to the desired position. Prepare the experiment, and then switch on the Sandbox and start the experiment.
 

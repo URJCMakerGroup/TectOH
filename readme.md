@@ -95,7 +95,7 @@ The Sandbox pushing a 5-kg sand load constrained within a box
 
 ## Contributors
 
-This work has been developed at [Universidad Rey Juan Carlos](https://www.urjc.es/) in Spain. It has bee a collaboration between the Area of Electronic Technology and the group [Tecvolrisk](https://tecvolrisk.wixsite.com/website) of the Area of Geology.
+This work has been developed at [Universidad Rey Juan Carlos](https://www.urjc.es/) in Spain. It has been a collaboration between the Area of Electronic Technology and the group [Tecvolrisk](https://tecvolrisk.wixsite.com/website) of the Area of Geology.
 
 ### Area of Electronic Technology:
 

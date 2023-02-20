@@ -18,6 +18,8 @@ It is not too complicated to build. It should be simpler than building a 3D prin
 
 This is the second version of the Open Hardware Sandbox. [Link to the first version](https://github.com/URJCMakerGroup/TFG-Cristina-Fernandez)
 
+
+
 ----
 
 ## License
@@ -78,16 +80,20 @@ This section includes graphs of the **results** and Python scripts to analyze th
 
 ## Pictures
 
-Sandbox experiment
+###Sandbox experiment
 
 ![Experiment](./imgs/foto_box.jpg)
 
 
-The Sandbox pushing a 10-kg sandpile
+###The Sandbox pushing a 10-kg sandpile
 
 ![Picture 10-kg sandpile](./imgs/foto_sandpile.jpg)
 
-The Sandbox pushing a 5-kg sand load constrained within a box
+The whole experiment took 3 hours and 45 minutes, the following sequence is fast-forward.
+
+![Sandpile test](./imgs/sandpile_test_animated.gif)
+
+###The Sandbox pushing a 5-kg sand load constrained within a box
 
 ![Picture 5-kg box](./imgs/foto_5kg_box.jpg)
 

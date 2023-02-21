@@ -80,22 +80,30 @@ This section includes graphs of the **results** and Python scripts to analyze th
 
 ## Pictures
 
-###Sandbox experiment
+### Sandbox experiment
 
 ![Experiment](./imgs/foto_box.jpg)
 
 
-###The Sandbox pushing a 10-kg sandpile
+### The Sandbox pushing a 10-kg sandpile
 
 ![Picture 10-kg sandpile](./imgs/foto_sandpile.jpg)
 
-The whole experiment took 3 hours and 45 minutes, the following sequence is fast-forward.
+The whole experiment took 3 hours and 45 minutes, the following sequence is fast-forwarded.
 
 ![Sandpile test](./imgs/sandpile_test_animated.gif)
 
-###The Sandbox pushing a 5-kg sand load constrained within a box
+### The Sandbox pushing a 5-kg sand load constrained within a box
 
 ![Picture 5-kg box](./imgs/foto_5kg_box.jpg)
+
+
+### The Sandbox in a geological experiment
+
+The experiment took 4 hours (at the end the camera was moved)
+
+![Sandpile test](./imgs/expgeo_animated.gif)
+
 
 ----
 

@@ -15,6 +15,9 @@ There are some [optional components](#distance-monitoring) for **measuring the d
 
 It is not too complicated to build. It should be simpler than building a 3D printer or CNC.
 
+For a more theoretical information about the system and detailed explanations of the experiments, you can check the paper:
+[Designing Low-Cost Open-Hardware Electromechanical Scientific Equipment: A Geological Analogue Modeling Sandbox](https://doi.org/10.1109/ACCESS.2023.3262617)
+
 
 This is the second version of the Open Hardware Sandbox. [Link to the first version](https://github.com/URJCMakerGroup/TFG-Cristina-Fernandez)
 
@@ -132,6 +135,16 @@ Some students have collaborated in the project doing their capstone project in I
 - [David Muñoz Bernal](https://github.com/davidmubernal/MakerWorkbench): FreeCAD workbench that includes many CAD parts of the project 
 - [Javier Letón](https://github.com/jleton10/TFG_Javier_Leton): Added the linear optical sensor
 - [Alicia Merchán](https://github.com/AliciaMH/TFGAliciaMerchan): future work in adding a second degree of freedom
+
+----
+
+## Citation
+
+If you use this hardware, you may want to cite the research article:
+[Designing Low-Cost Open-Hardware Electromechanical Scientific Equipment: A Geological Analogue Modeling Sandbox](https://doi.org/10.1109/ACCESS.2023.3262617)
+
+F. Machado et al., "Designing Low-Cost Open-Hardware Electromechanical Scientific Equipment: A Geological Analogue Modeling Sandbox," in IEEE Access, vol. 11, pp. 31716-31746, 2023, doi: 10.1109/ACCESS.2023.3262617.
+
 
 
 
